@@ -4,7 +4,7 @@ import {
   CapturedTurnHost,
   type CapturedTurnStyle,
 } from '@/app/reader/utils/capturedTurn';
-import { PageCurlRenderer } from '@/utils/pageCurl';
+import { PageCurlRenderer, type CurlFoldInput } from '@/utils/pageCurl';
 
 // Choreography tests for the captured page-turn controller (readest#555):
 // capture the page → overlay the captured bitmap → instantly navigate the
@@ -73,6 +73,73 @@ describe('CapturedPageTurn (browser)', () => {
     expect(navigate).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledWith(true);
     // Overlay fully cleaned up.
+    expect(host.querySelector('canvas')).toBeNull();
+  });
+
+  it('folds a programmatic curl straight across the middle of the held edge', async () => {
+    // A tap, key or wheel turn has no finger, so the controller scripts one.
+    // It must read as a horizontal fold from the centre of the held edge:
+    // giving the scripted drag any vertical component makes the very same turn
+    // look like a diagonal drag.
+    const render = vi.spyOn(PageCurlRenderer.prototype, 'render');
+    let folds: CurlFoldInput[] = [];
+    try {
+      expect(await controller.turn(true, false, 'curl')).toBe(true);
+      // Read the calls before restoring: mockRestore clears them.
+      folds = render.mock.calls
+        .map((call) => call[3])
+        .filter((fold): fold is CurlFoldInput => fold != null);
+    } finally {
+      render.mockRestore();
+    }
+    expect(folds.length).toBeGreaterThan(0);
+    for (const fold of folds) {
+      // Forward LTR lifts the right edge, and the fold pivots at its middle.
+      expect(fold.corner.x).toBe(1);
+      expect(fold.corner.y).toBeCloseTo(0.5, 6);
+      expect(fold.finger.y).toBeCloseTo(fold.corner.y, 6);
+    }
+  });
+
+  it('animates a programmatic turn while the live view is still turning underneath', async () => {
+    // The paginator's page turn ends with a 100ms settle, and `navigate()`
+    // drops the `animated` attribute so that settle has no animation to
+    // overlap it. Awaiting it before animating showed the covered page frozen
+    // solid for the whole setup, which is what a tap or a key press felt like.
+    let releaseNavigation!: () => void;
+    navigate.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (releaseNavigation = resolve)),
+    );
+    const render = vi.spyOn(PageCurlRenderer.prototype, 'render');
+    try {
+      const turning = controller.turn(true, false, 'curl');
+      const deadline = Date.now() + 1000;
+      while (render.mock.calls.length <= 1 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(navigate).toHaveBeenCalledTimes(1);
+      // The covering frame plus at least one moving frame: the sheet is
+      // animating although the live view has not turned yet.
+      expect(render.mock.calls.length).toBeGreaterThan(1);
+      releaseNavigation();
+      await expect(turning).resolves.toBe(true);
+    } finally {
+      render.mockRestore();
+    }
+  });
+
+  it('keeps the cover mounted until the live view has turned', async () => {
+    let releaseNavigation!: () => void;
+    navigate.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (releaseNavigation = resolve)),
+    );
+    const turning = controller.turn(true, false, 'curl');
+    // Outlast the play-out: the animation is over, but lifting the cover here
+    // would flash the page the live view has not turned away from yet.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(host.querySelector('canvas')).not.toBeNull();
+    releaseNavigation();
+    await expect(turning).resolves.toBe(true);
     expect(host.querySelector('canvas')).toBeNull();
   });
 

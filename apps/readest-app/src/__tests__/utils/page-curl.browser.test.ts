@@ -304,3 +304,109 @@ describe('PageCurlRenderer two-column leaf (browser)', () => {
     expect(renderer.canvasOpacity).toBe('');
   });
 });
+
+// The finger-solved fold: the crease is the perpendicular bisector of the
+// segment from the held corner to the finger, so the sheet follows the finger
+// in BOTH axes. The swept model can only advance one fixed direction by a
+// scalar, which is what makes a held page feel inert once the finger moves
+// across the drag axis (readest mobile page turn).
+describe('PageCurlRenderer finger-solved fold (browser)', () => {
+  let renderer: PageCurlRenderer;
+  let host: HTMLDivElement;
+  const CORNER = { x: 1, y: 1 };
+
+  beforeEach(async () => {
+    host = document.createElement('div');
+    Object.assign(host.style, {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      width: `${W}px`,
+      height: `${H}px`,
+    });
+    document.body.appendChild(host);
+    renderer = new PageCurlRenderer();
+    renderer.attach(host, W, H, 1);
+    renderer.setTexture(await makePageBitmap());
+  });
+
+  afterEach(() => {
+    renderer?.dispose();
+    host?.remove();
+  });
+
+  const sample = () => {
+    const pixels: number[][] = [];
+    for (let x = 6; x < W; x += 14) {
+      for (let y = 6; y < H; y += 14) pixels.push(renderer.readPixel(x, y));
+    }
+    return pixels;
+  };
+  const differing = (a: number[][], b: number[][]) =>
+    a.reduce((n, px, i) => n + (px.some((v, c) => v !== b[i]![c]) ? 1 : 0), 0);
+
+  it('moves the fold when only the finger height changes', () => {
+    renderer.render(0, { x: 1, y: 1 }, false, { finger: { x: 0.5, y: 0.5 }, corner: CORNER });
+    const low = sample();
+    renderer.render(0, { x: 1, y: 1 }, false, { finger: { x: 0.5, y: 0.8 }, corner: CORNER });
+    const high = sample();
+    // Identical horizontal drag: a scalar sweep would render these the same.
+    expect(differing(low, high)).toBeGreaterThan(low.length / 5);
+  });
+
+  it('renders identically when the finger has not moved', () => {
+    const fold = { finger: { x: 0.5, y: 0.5 }, corner: CORNER };
+    renderer.render(0, { x: 1, y: 1 }, false, fold);
+    const first = sample();
+    renderer.render(0, { x: 1, y: 1 }, false, fold);
+    expect(differing(first, sample())).toBe(0);
+  });
+
+  it('shades the flat sheet in toward the crease and casts a shadow past it', () => {
+    // A shallow straight fold: the corner has come in a quarter of the page,
+    // so the crease sits at x = 350 with its normal on the held corner and the
+    // sheet left of it is still the flat front (blue there).
+    renderer.render(0, { x: 1, y: 1 }, false, { finger: { x: 0.75, y: 1 }, corner: CORNER });
+    const nearCrease = renderer.readPixel(340, 40);
+    const farFromCrease = renderer.readPixel(305, 40);
+    expect(nearCrease[3]).toBe(255);
+    expect(farFromCrease[3]).toBe(255);
+    expect(nearCrease[2]).toBeLessThan(farFromCrease[2] - 8);
+    // Past the held corner the sheet has lifted away, leaving only its cast
+    // shadow over the live page: dark, translucent, and fading outwards.
+    const shadowNear = renderer.readPixel(375, 40);
+    const shadowFar = renderer.readPixel(395, 40);
+    expect(shadowNear[3]).toBeGreaterThan(0);
+    expect(shadowNear[3]).toBeLessThan(120);
+    expect(shadowFar[3]).toBeGreaterThan(0);
+    expect(shadowFar[3]).toBeLessThan(shadowNear[3]);
+  });
+
+  it('leaves the folded back an unshaded bleed-through of the same page', () => {
+    // Half the page across: the leaf's flat part has laid over the sheet, so
+    // both probes sit on its back with no fold ridge between them.
+    renderer.render(0, { x: 1, y: 1 }, false, { finger: { x: 0, y: 1 }, corner: CORNER });
+    const backNear = renderer.readPixel(190, 40);
+    const backFar = renderer.readPixel(60, 40);
+    expect(backNear[3]).toBe(255);
+    expect(backFar[3]).toBe(255);
+    // The crease must not shade the back: that would read as a separate
+    // surface rather than the reverse of this page.
+    for (let channel = 0; channel < 3; channel++) {
+      expect(Math.abs(backNear[channel]! - backFar[channel]!)).toBeLessThanOrEqual(2);
+    }
+    // The mirrored content still shows through: the same screen column reads
+    // blue at the top and yellow at the bottom, not one flat paper colour.
+    const top = renderer.readPixel(60, 40);
+    const bottom = renderer.readPixel(60, H - 40);
+    expect(top[2]).toBeGreaterThan(top[0]! + 20);
+    expect(bottom[0]).toBeGreaterThan(bottom[2]! + 20);
+  });
+
+  it('clears the page once the crease has left the sheet', () => {
+    renderer.render(0, { x: 1, y: 1 }, false, { finger: { x: -1, y: 1 }, corner: CORNER });
+    for (const x of [20, W / 2, W - 20]) {
+      expect(renderer.readPixel(x, 150)[3]).toBe(0);
+    }
+  });
+});

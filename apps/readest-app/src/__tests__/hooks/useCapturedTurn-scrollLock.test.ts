@@ -3,6 +3,7 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import type { FoliateView } from '@/types/view';
 import type { ViewSettings } from '@/types/book';
 import type { TouchDetail } from '@/app/reader/hooks/useTouchInterceptor';
+import { CURL_ROLL_BACKWARD, curlFoldFromFinger } from '@/utils/pageCurl';
 
 // The captured page-turn (slide/curl) swipe is handled by an app-side touch
 // interceptor because `no-swipe` disables the paginator's own swipe. Push mode
@@ -146,10 +147,11 @@ const detail = (
   deltaY = 0,
   deltaT = 16,
   startX = 0,
+  startY = 0,
 ): TouchDetail => ({
   phase,
   touch: { screenX: startX + deltaX, screenY: deltaY },
-  touchStart: { screenX: startX, screenY: 0 },
+  touchStart: { screenX: startX, screenY: startY },
   deltaX,
   deltaY,
   deltaT,
@@ -517,10 +519,10 @@ describe('useCapturedTurn scroll-lock gate', () => {
     dispatchTouchInterceptors('book-1', detail('move', -6, 0, 32, 150));
 
     expect(h.controller.beginDrag).toHaveBeenCalledWith(true, false, 'slide');
-    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(0, 0.5);
+    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(0, 0.5, null, null);
 
     dispatchTouchInterceptors('book-1', detail('move', -36, 0, 48, 150));
-    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(30 / 300, 0.5);
+    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(30 / 300, 0.5, null, null);
   });
 
   test('keeps a short Slide flick visually flat at claim but uses its full release intent', () => {
@@ -535,7 +537,7 @@ describe('useCapturedTurn scroll-lock gate', () => {
     expect(dispatchTouchInterceptors('book-1', detail('move', -30, 0, 16, 150))).toBe(true);
 
     expect(h.controller.beginDrag).toHaveBeenCalledWith(true, false, 'slide');
-    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(0, 0.5);
+    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(0, 0.5, null, null);
 
     expect(dispatchTouchInterceptors('book-1', detail('end', -30, 0, 16, 150))).toBe(true);
     expect(h.controller.endDrag).toHaveBeenCalledWith(true, expect.any(Number));
@@ -636,7 +638,21 @@ describe('useCapturedTurn scroll-lock gate', () => {
       await Promise.resolve();
     });
 
-    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(15 / window.innerWidth, 0.5);
+    const [progress, grabY, fold] = h.controller.moveDrag.mock.calls.at(-1)!;
+    // The fold pivots on the held page edge at the height the reader touched,
+    // and the finger is that pivot carried by the gesture — so the distance
+    // consumed during gesture recognition is part of the fold, not dropped.
+    expect(fold).toEqual({
+      corner: { x: 1, y: 0 },
+      finger: { x: 1 - 15 / window.innerWidth, y: 0 },
+    });
+    // The painted sweep is the crease's own position, which for a straight
+    // fold only covers half the finger's travel.
+    expect(progress).toBeCloseTo(
+      curlFoldFromFinger(window.innerWidth, window.innerHeight, fold!)!.progress,
+      6,
+    );
+    expect(grabY).toBe(0.5);
   });
 
   test('preserves total travel when horizontal intent is recognized later', async () => {
@@ -651,10 +667,101 @@ describe('useCapturedTurn scroll-lock gate', () => {
       await Promise.resolve();
     });
 
-    expect(h.controller.moveDrag).toHaveBeenLastCalledWith(
-      100 / window.innerWidth,
-      expect.any(Number),
-    );
+    const [, , fold] = h.controller.moveDrag.mock.calls.at(-1)!;
+    // The fold pivots where the gesture began, so all 100px of travel counts
+    // even though the first samples were only recognised later.
+    expect(fold).toEqual({
+      corner: { x: 1, y: 0 },
+      finger: { x: 1 - 100 / window.innerWidth, y: 80 / window.innerHeight },
+    });
+  });
+
+  test('pulls a curl drag back so the crease cannot lift the far corners', async () => {
+    const cell = document.createElement('div');
+    cell.id = 'gridcell-book-1';
+    vi.spyOn(cell, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 320, 640));
+    document.body.appendChild(cell);
+    renderHook(() => useCapturedTurn('book-1', { current: makeView() }));
+
+    // Hold the edge at 58% height and stray down-left. Unclamped, this crease
+    // runs corner to corner and folds the far half of the sheet over itself.
+    const corner = { x: 1, y: 374 / 640 };
+    const raw = { x: 1 - 70 / 320, y: 429 / 640 };
+    const rawFold = curlFoldFromFinger(320, 640, { finger: raw, corner })!;
+    const side = (fold: NonNullable<typeof rawFold>, point: [number, number]) =>
+      (point[0] - fold.fold[0]) * fold.dir[0] + (point[1] - fold.fold[1]) * fold.dir[1];
+    expect(side(rawFold, [0, 0])).toBeGreaterThan(0);
+
+    dispatchTouchInterceptors('book-1', detail('start', 0, 0, 0, 150, 374));
+    dispatchTouchInterceptors('book-1', detail('move', -70, 55, 16, 150, 374));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const [progress, , fold] = h.controller.moveDrag.mock.calls.at(-1)!;
+    // The fold survives — it is pulled back along its own ray, so the crease
+    // angle is the reader's — but no far corner may end up on the folded side.
+    expect(fold).not.toBeNull();
+    const solved = curlFoldFromFinger(320, 640, fold!)!;
+    expect(side(solved, [0, 0])).toBeLessThanOrEqual(1e-6);
+    expect(side(solved, [0, 640])).toBeLessThanOrEqual(1e-6);
+    expect(fold!.finger.x).toBeGreaterThan(raw.x);
+    // The painted sweep is still the crease's own position, so a release
+    // settles from where the sheet actually is.
+    expect(progress).toBeCloseTo(solved.progress, 6);
+  });
+
+  test('folds nothing when a stray curl drag has no legal crease left', async () => {
+    const cell = document.createElement('div');
+    cell.id = 'gridcell-book-1';
+    vi.spyOn(cell, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 320, 640));
+    document.body.appendChild(cell);
+    renderHook(() => useCapturedTurn('book-1', { current: makeView() }));
+
+    // A horizontal-dominant drag (so the turn is claimed) from low on the held
+    // edge, angled down: every crease direction left would hinge the sheet on
+    // the far corner, so the sheet stays put instead of folding somewhere it
+    // cannot.
+    dispatchTouchInterceptors('book-1', detail('start', 0, 0, 0, 150, 500));
+    dispatchTouchInterceptors('book-1', detail('move', -100, 80, 16, 150, 500));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(h.controller.beginDrag).toHaveBeenCalled();
+    const [progress, , fold] = h.controller.moveDrag.mock.calls.at(-1)!;
+    // Nothing is folded, so the frame goes to the swept model: a release that
+    // still commits the turn animates rather than sitting flat.
+    expect(fold).toBeNull();
+    expect(progress).toBe(0);
+  });
+
+  test('scripts a backward curl drag into a vertical crease with its own roll', async () => {
+    const cell = document.createElement('div');
+    cell.id = 'gridcell-book-1';
+    vi.spyOn(cell, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 320, 640));
+    document.body.appendChild(cell);
+    renderHook(() => useCapturedTurn('book-1', { current: makeView() }));
+
+    // A reverse swipe (rightward in an LTR book) that arcs well off the row:
+    // a finger-solved crease would go diagonal here, which is the whole reason
+    // reversing gets its own, always-vertical crease.
+    dispatchTouchInterceptors('book-1', detail('start', 0, 0, 0, 40, 380));
+    dispatchTouchInterceptors('book-1', detail('move', 160, 120, 16, 40, 380));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const [progress, , fold, roll] = h.controller.moveDrag.mock.calls.at(-1)!;
+    expect(roll).toEqual(CURL_ROLL_BACKWARD);
+    const solved = curlFoldFromFinger(320, 640, fold!)!;
+    // The crease is vertical: its normal has no vertical component at all.
+    expect(Math.abs(solved.dir[0])).toBeCloseTo(1, 6);
+    expect(solved.dir[1]).toBeCloseTo(0, 6);
+    // ...and it follows the horizontal drag one to one: 160px across a 320px
+    // page puts the crease at the middle, not at a quarter as a bisector would.
+    expect(solved.fold[0]).toBeCloseTo(160, 6);
+    expect(progress).toBeCloseTo(160 / 320, 6);
   });
 
   test('forwards the latest sample before queueing release while capture is pending', async () => {
@@ -675,10 +782,15 @@ describe('useCapturedTurn scroll-lock gate', () => {
 
     expect(released).toBe(true);
     expect(h.controller.endDrag).toHaveBeenCalledWith(true, 5);
-    const lastSample = h.controller.moveDrag.mock.calls.at(-1)!;
-    // 240px of total travel across the 300px captured reader cell.
-    expect(lastSample[0]).toBeCloseTo(0.8);
-    expect(lastSample[1]).toBeCloseTo(0.52);
+    const [progress, grabY, fold] = h.controller.moveDrag.mock.calls.at(-1)!;
+    // All 240px of travel across the 300px captured reader cell is the finger
+    // the pending capture will be revealed at.
+    expect(fold).toEqual({
+      corner: { x: 1, y: 0 },
+      finger: { x: 1 - 240 / 300, y: 10 / 500 },
+    });
+    expect(progress).toBeCloseTo(curlFoldFromFinger(300, 500, fold!)!.progress, 6);
+    expect(grabY).toBeCloseTo(0.52);
     expect(h.controller.moveDrag.mock.invocationCallOrder.at(-1)!).toBeLessThan(
       h.controller.endDrag.mock.invocationCallOrder[0]!,
     );
@@ -698,6 +810,26 @@ describe('useCapturedTurn scroll-lock gate', () => {
 
     // 20px / 50ms = 0.4px/ms, above the 0.3 flick threshold.
     expect(h.controller.endDrag).toHaveBeenCalledWith(true, 0.4);
+  });
+
+  test('commits a slow curl drag past halfway even though a fold sweeps only half of it', () => {
+    const cell = document.createElement('div');
+    cell.id = 'gridcell-book-1';
+    vi.spyOn(cell, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 300, 500));
+    document.body.appendChild(cell);
+    renderHook(() => useCapturedTurn('book-1', { current: makeView() }));
+
+    // 160px across the 300px reader cell, taken slowly: nowhere near the flick
+    // threshold, so the commit has to come from the gesture distance.
+    dispatchTouchInterceptors('book-1', detail('start', 0, 0, 0, 150));
+    dispatchTouchInterceptors('book-1', detail('move', -160, 0, 900, 150));
+    const [, , fold] = h.controller.moveDrag.mock.calls.at(-1)!;
+    // The same gesture only folds a third of the sheet, which is well under the
+    // halfway bar: intent and sweep are deliberately different numbers.
+    expect(curlFoldFromFinger(300, 500, fold!)!.progress).toBeLessThan(0.4);
+    dispatchTouchInterceptors('book-1', detail('end', -160, 0, 920, 150));
+
+    expect(h.controller.endDrag).toHaveBeenCalledWith(true, expect.any(Number));
   });
 
   test('lets distance and sub-flick release speed combine to commit a Slide', () => {

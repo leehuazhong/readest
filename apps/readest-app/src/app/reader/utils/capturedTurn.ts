@@ -1,4 +1,11 @@
-import { CurlGrab, PageCurlRenderer } from '@/utils/pageCurl';
+import {
+  CURL_ROLL_DEFAULT,
+  CurlFoldInput,
+  CurlGrab,
+  CurlRollStyle,
+  PageCurlRenderer,
+  curlFingerAtProgress,
+} from '@/utils/pageCurl';
 import { PagePushRenderer } from '@/utils/pagePush';
 import { PageSlideRenderer, type PageSlideSettleOptions } from '@/utils/pageSlide';
 
@@ -108,7 +115,15 @@ interface TurnRenderer {
   setIncoming?(source: TexImageSource | null): void;
   /** Whether an idle GPU surface survived context eviction. */
   isUsable?(): boolean;
-  render(progress: number, grab: CurlGrab, rtl: boolean): void;
+  /** `fold` carries the finger for a curl; the renderer then solves the
+   *  crease from it instead of sweeping one direction by `progress`. */
+  render(
+    progress: number,
+    grab: CurlGrab,
+    rtl: boolean,
+    fold?: CurlFoldInput | null,
+    roll?: CurlRollStyle,
+  ): void;
   animateSettle?(options: PageSlideSettleOptions): Animation | null;
   dispose(): void;
 }
@@ -116,6 +131,10 @@ interface TurnRenderer {
 interface DragSession {
   progress: number;
   grabY: number;
+  /** Finger and latched corner while a curl is scrubbed, else null. */
+  fold: CurlFoldInput | null;
+  /** The roll this drag paints with, or null for the renderer's default. */
+  roll: CurlRollStyle | null;
 }
 
 interface CaptureRect {
@@ -167,8 +186,21 @@ interface ActiveTurn {
   columns: number;
   /** In-flight capture of the incoming column for the leaf's back, if any. */
   incoming: Promise<void> | null;
+  /**
+   * The live view's turn while it is still in flight, for a programmatic turn
+   * that animates first and lands the navigation underneath the cover. Null
+   * whenever the turn was awaited during setup — the drag and two-column case.
+   */
+  navigation: Promise<void> | null;
   progress: number;
   grabY: number;
+  /** Page size in CSS px, i.e. the renderer's own page space (pageCurl). */
+  width: number;
+  height: number;
+  /** Finger-solved fold for a scrubbed curl, else null (swept model). */
+  fold: CurlFoldInput | null;
+  /** The roll this turn paints with: a drag brings its own, else the default. */
+  roll: CurlRollStyle;
   /** Buffered input and identity token, absent for programmatic turns. */
   dragSession: DragSession | null;
   raf: number;
@@ -391,7 +423,10 @@ export class CapturedPageTurn {
         if (!this.#reserveActiveSurface()) return false;
         let active: ActiveTurn | null;
         try {
-          active = await this.#setUp(forward, rtl, style);
+          // Let the sheet start moving while the live view turns underneath.
+          // `#setUp` hands back a still-in-flight navigation for a
+          // single-column page instead of holding the animation behind it.
+          active = await this.#setUp(forward, rtl, style, null, true);
         } catch (error) {
           activeSurfaceOwners.delete(this);
           throw error;
@@ -400,6 +435,7 @@ export class CapturedPageTurn {
           activeSurfaceOwners.delete(this);
           return false;
         }
+        let navigationError: unknown;
         try {
           if (active.incoming) {
             await Promise.race([
@@ -410,7 +446,17 @@ export class CapturedPageTurn {
           await this.#playTo(active, 1);
           return true;
         } finally {
+          // The cover has to outlive the navigation: lifting it first would
+          // flash the page the live view has not turned away from yet.
+          if (active.navigation) {
+            try {
+              await active.navigation;
+            } catch (error) {
+              navigationError = error;
+            }
+          }
           if (this.#active === active) this.#disposeActive();
+          if (navigationError !== undefined) throw navigationError;
         }
       } finally {
         // Release the gate as the turn settles, before the caller's awaiter
@@ -443,7 +489,7 @@ export class CapturedPageTurn {
     // touchend. Cancel that specific request before queueing the new one;
     // token matching keeps the synthesized cancellation on its own overlay.
     this.#cancelOpenDrag();
-    const session: DragSession = { progress: 0, grabY: 0.5 };
+    const session: DragSession = { progress: 0, grabY: 0.5, fold: null, roll: null };
     this.#dragSession = session;
     this.#busyDragSessions.add(session);
     const run = this.#pending.then(async () => {
@@ -483,11 +529,18 @@ export class CapturedPageTurn {
   }
 
   /** Scrub the turn from the finger. Safe to call while beginDrag is pending. */
-  moveDrag(progress: number, grabY: number) {
+  moveDrag(
+    progress: number,
+    grabY: number,
+    fold: CurlFoldInput | null = null,
+    roll: CurlRollStyle | null = null,
+  ) {
     const session = this.#dragSession;
     if (!session) return;
     session.progress = Math.min(1, Math.max(0, progress));
     session.grabY = grabY;
+    session.fold = fold;
+    session.roll = roll;
     const active = this.#active;
     // A following drag can be queued while the previous overlay is settling.
     // Never paint the new gesture's sample onto that older page.
@@ -601,6 +654,14 @@ export class CapturedPageTurn {
     rtl: boolean,
     style: CapturedTurnStyle,
     dragSession: DragSession | null = null,
+    /**
+     * Hand back a still-in-flight navigation instead of awaiting it, so a
+     * programmatic turn can animate while the live view turns underneath. Only
+     * a single-column page takes this: a two-column leaf shows the incoming
+     * column on its back, and the original ordering exists to give that
+     * texture time before the sheet moves.
+     */
+    deferNavigation = false,
   ): Promise<ActiveTurn | null> {
     if (this.#disposed) return null;
     let target = this.#readCaptureTarget();
@@ -746,8 +807,13 @@ export class CapturedPageTurn {
       rendererRtl: forward ? rtl : !rtl,
       columns: style === 'curl' && (this.#host.getColumnCount?.() ?? 1) >= 2 ? 2 : 1,
       incoming: null,
+      navigation: null,
       progress: 0,
       grabY: 0.5,
+      width: captureRect.width,
+      height: captureRect.height,
+      fold: null,
+      roll: CURL_ROLL_DEFAULT,
       dragSession,
       raf: 0,
       animation: null,
@@ -755,11 +821,30 @@ export class CapturedPageTurn {
     };
     this.#active = active;
 
+    // A keyed, tapped or wheel curl has no finger to follow, so script one:
+    // the reader pinches the middle of the held edge and draws it straight
+    // across. A tap or a volume key must read as a horizontal fold from the
+    // centre of that edge, so the scripted drag has no vertical component —
+    // tilting it here would make the same turn look diagonal. Without a script
+    // at all a programmatic turn would fall back to the swept model and look
+    // like a different effect.
+    if (style === 'curl' && !dragSession) {
+      const pivot: CurlGrab = { x: active.rendererRtl ? 0 : 1, y: 0.5 };
+      const toward: CurlGrab = { x: active.rendererRtl ? 1 : -1, y: 0 };
+      // Seed only to give the fold a direction; the settle walks it out from
+      // the pivot, where it is worth a fraction of a pixel of sweep.
+      const seed = 0.01;
+      active.fold = {
+        corner: pivot,
+        finger: { x: pivot.x + toward.x * seed, y: pivot.y + toward.y * seed },
+      };
+    }
+
     // First frame draws the captured page exactly covering the content box,
     // hiding the instant page swap happening underneath.
     try {
       renderer.setColumns?.(active.columns);
-      renderer.render(0, this.#grab(active), active.rendererRtl);
+      this.#paint(active);
       if (renderer.isUsable?.() === false) {
         throw new Error('Captured page-turn renderer became unavailable before navigation');
       }
@@ -791,12 +876,17 @@ export class CapturedPageTurn {
         if (this.#active === active) this.#disposeActive();
         return null;
       }
-      await this.#host.navigate(forward);
-      if (this.#disposed || this.#active !== active) return null;
-      if (active.columns === 2 && this.#host.coverRegion) {
-        // Runs alongside the turn; a failure simply leaves the paper back.
-        active.incoming = this.#captureIncoming(active, captureRect).catch(() => {});
+      // A single-column page has nothing on its back, so the sheet can start
+      // moving now and let the live view land underneath the cover — the
+      // overlap a finger drag already gets from its own move samples. A
+      // two-column leaf keeps the original sequence, because its back shows the
+      // incoming column and today's ordering gives that texture time first.
+      const navigation = this.#commitNavigation(active, forward, captureRect);
+      if (!deferNavigation || active.columns === 2) {
+        await navigation;
+        return this.#active === active ? active : null;
       }
+      active.navigation = navigation;
       return active;
     } catch (error) {
       if (this.#disposed) return null;
@@ -815,8 +905,53 @@ export class CapturedPageTurn {
     }
   }
 
+  /**
+   * Turn the live view underneath the cover, and start the two-column leaf's
+   * back capture. Split out of `#setUp` so a programmatic turn can defer it.
+   *
+   * `Paginator#turnPage` ends with a 100ms settle, and `navigate()` drops the
+   * `animated` attribute to make the underlying turn instant — so that settle
+   * is paid in full with no animation to overlap it. Awaiting it inside setup
+   * put the whole delay in front of the sheet's first moving frame, which read
+   * as the covered page freezing solid before every tap or key turn.
+   */
+  async #commitNavigation(active: ActiveTurn, forward: boolean, captureRect: CaptureRect) {
+    try {
+      await this.#host.navigate(forward);
+    } catch (error) {
+      // Once the covering frame is mounted, a failed navigation must restore
+      // the pre-turn chrome and remove the cover, or a failed instant
+      // navigation leaves the toolbar and the captured canvas stuck.
+      if (!this.#disposed) {
+        try {
+          await this.#host.onCancelled?.(active.style);
+        } catch {
+          // Preserve the navigation failure as the caller-facing error.
+        }
+        if (this.#active === active) this.#disposeActive();
+      }
+      throw error;
+    }
+    if (this.#disposed || this.#active !== active) return;
+    if (active.columns === 2 && this.#host.coverRegion) {
+      // Runs alongside the turn; a failure simply leaves the paper back.
+      active.incoming = this.#captureIncoming(active, captureRect).catch(() => {});
+    }
+  }
+
   #grab(active: ActiveTurn) {
     return { x: active.rendererRtl ? 0 : 1, y: active.grabY };
+  }
+
+  /** Draw the active turn at its current progress. */
+  #paint(active: ActiveTurn) {
+    active.renderer.render(
+      active.progress,
+      this.#grab(active),
+      active.rendererRtl,
+      active.fold,
+      active.roll,
+    );
   }
 
   /**
@@ -869,7 +1004,7 @@ export class CapturedPageTurn {
     try {
       if (this.#active !== active || this.#host.isCaptureAllowed?.() === false) return;
       active.renderer.setIncoming?.(bitmap);
-      active.renderer.render(active.progress, this.#grab(active), active.rendererRtl);
+      this.#paint(active);
     } finally {
       bitmap.close();
     }
@@ -878,7 +1013,11 @@ export class CapturedPageTurn {
   #applyDragSession(active: ActiveTurn, session: DragSession) {
     active.progress = session.progress;
     active.grabY = session.grabY;
-    active.renderer.render(active.progress, this.#grab(active), active.rendererRtl);
+    active.fold = session.fold;
+    // The drag owns the roll while it scrubs; a style-less sample (the swept
+    // styles, or a gesture that brought no fold) keeps the turn's own.
+    if (session.roll) active.roll = session.roll;
+    this.#paint(active);
   }
 
   async #ensurePreparedSurface(
@@ -1249,13 +1388,34 @@ export class CapturedPageTurn {
         easeInOutQuad(t) * (1 - easeOutBlend) + easeOutCubic(t) * easeOutBlend;
       active.finish = resolve;
 
+      // A finger-solved fold must keep the crease angle the reader released
+      // at, so the settle walks the finger out along that exact direction and
+      // lets the derived sweep follow the easing. The swept model tweens the
+      // scalar, which is what the one-dimensional styles still do.
+      const fold = active.fold;
+      const direction = fold
+        ? { x: fold.finger.x - fold.corner.x, y: fold.finger.y - fold.corner.y }
+        : null;
+      const applyProgress = (progress: number) => {
+        active.progress = progress;
+        if (!fold || !direction) return;
+        const finger = curlFingerAtProgress(
+          active.width,
+          active.height,
+          fold.corner,
+          direction,
+          progress,
+        );
+        if (finger) fold.finger = finger;
+      };
+
       const runRafFallback = () => {
         const start = performance.now();
         const step = (now: number) => {
           if (this.#active !== active) return resolve();
           const t = Math.min(1, (now - start) / duration);
-          active.progress = from + span * easing(t);
-          active.renderer.render(active.progress, this.#grab(active), active.rendererRtl);
+          applyProgress(from + span * easing(t));
+          this.#paint(active);
           if (t < 1) {
             active.raf = requestAnimationFrame(step);
           } else {
@@ -1296,8 +1456,8 @@ export class CapturedPageTurn {
         // Persist the terminal transform before removing the fill effect. This
         // is essential on cancellation: the old page must remain flat while
         // the live paginator and toolbar are restored underneath it.
-        active.progress = target;
-        active.renderer.render(target, this.#grab(active), active.rendererRtl);
+        applyProgress(target);
+        this.#paint(active);
         active.animation = null;
         active.finish = null;
         clearHandlers();

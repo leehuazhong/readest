@@ -12,6 +12,14 @@ import { detectViewTransitionGroup } from '@/utils/viewTransition';
 import { TURN_GESTURE_LEFT_INSET_ATTRIBUTE } from '../utils/brightnessGesture';
 import { isLayeredTurnTouchActive, setLayeredTurnTouchClaimed } from '../utils/iframeEventHandlers';
 import { CapturedPageTurn, CapturedTurnStyle } from '../utils/capturedTurn';
+import {
+  CURL_ROLL_BACKWARD,
+  CurlFoldInput,
+  CurlGrab,
+  CurlRollStyle,
+  clampCurlFinger,
+  curlFoldFromFinger,
+} from '@/utils/pageCurl';
 import { renderTurnBackdrop } from '../utils/turnBackdrop';
 import {
   createTurnGestureIntent as createArenaIntent,
@@ -119,13 +127,74 @@ interface DragState {
   forward: boolean;
   width: number;
   height: number;
+  /** Page columns the captured cell holds: 2 turns one leaf at the spine. */
+  columns: number;
   /** Finger distance already consumed when a Slide gesture was claimed. */
   visualOriginDistance: number;
+  /**
+   * The painted sweep. For a curl this is the crease's own position as solved
+   * from the finger, so intent, settle timing and the swatch all read the same
+   * number and a release never has to jump to catch up.
+   */
   progress: number;
   grabY: number;
+  /**
+   * The fold pivots on the held page edge at the height the reader touched,
+   * and `finger` is that pivot carried by the gesture. Starting them equal
+   * means the fold begins at zero travel: no jump on claim, and no corner to
+   * latch as the finger crosses the middle of the page.
+   */
+  pivot: CurlGrab;
+  /**
+   * The pivot carried by the gesture, clamped to the crease limits
+   * (clampCurlFinger) so a stray drag cannot fold the sheet sideways. The
+   * release still reads the raw gesture distance, so a drag that has run into
+   * the limit can still commit the turn.
+   */
+  finger: CurlGrab;
   releaseSamples: { distance: number; time: number }[];
   lastMovementTime: number;
 }
+
+/**
+ * The sheet a dragged curl turns: the whole page, or — with two columns on
+ * screen — only the outer column, whose far edge is the spine.
+ */
+const curlLimitOptions = (state: DragState) =>
+  state.columns >= 2 ? { leafWidth: state.width / 2, farX: state.width / 2 } : {};
+
+/** The curl's fold input, or null for the styles that sweep by a scalar. */
+const dragFold = (state: DragState): CurlFoldInput | null => {
+  if (state.style !== 'curl') return null;
+  const input: CurlFoldInput = { finger: state.finger, corner: state.pivot };
+  // A drag the crease limits clamped to nothing folds nothing: hand the frame
+  // to the swept model instead of painting a fold the limits just rejected, so
+  // a release that still commits the turn animates rather than sitting flat.
+  return curlFoldFromFinger(state.width, state.height, input) ? input : null;
+};
+
+/** A backward drag paints with its own roll and shadow; null = the default. */
+const dragRoll = (state: DragState): CurlRollStyle | null =>
+  state.style === 'curl' && !state.forward ? CURL_ROLL_BACKWARD : null;
+
+/**
+ * A backward curl drag does not solve its crease from the finger. Reversing the
+ * page is its own gesture: the crease stays vertical and its position follows
+ * the horizontal drag one to one, so a reverse turn cannot be dragged into the
+ * diagonal, cross-page peel a forward drag has to be clamped out of. The
+ * scripted finger rides at twice the crease's distance from the pivot (the
+ * bisector walks half the finger), on the held edge's own row, and only ever
+ * travels into the sheet: a push the other way folds nothing.
+ */
+const backwardFinger = (state: DragState, rawFinger: CurlGrab): CurlGrab => {
+  const towards = state.pivot.x < 0.5 ? 1 : -1;
+  const into = (rawFinger.x - state.pivot.x) * state.width * towards;
+  const travel = Math.max(0, Math.min(state.width, into));
+  return {
+    x: state.pivot.x + (towards * 2 * travel) / state.width,
+    y: state.pivot.y,
+  };
+};
 
 const RELEASE_VELOCITY_WINDOW_MS = 90;
 const RELEASE_PAUSE_THRESHOLD_MS = 80;
@@ -869,14 +938,27 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
             return true;
           }
           const rect = document.getElementById(`gridcell-${bookKey}`)?.getBoundingClientRect();
+          const width = rect?.width || window.innerWidth;
+          const height = rect?.height || window.innerHeight;
+          // The fold only needs the touched height (to pivot on the held edge
+          // at that height); x comes from which edge the turn is held on.
+          const windowScreenY = Number.isFinite(window.screenY) ? window.screenY : 0;
+          const startY = detail.touchStart.screenY - windowScreenY - (rect?.top ?? 0);
+          const rendererRtl = forward ? viewSettings.rtl : !viewSettings.rtl;
+          const pivot: CurlGrab = { x: rendererRtl ? 0 : 1, y: startY / height };
           const startedState: DragState = {
             style,
             forward,
-            width: rect?.width || window.innerWidth,
-            height: rect?.height || window.innerHeight,
+            width,
+            height,
+            // A spread turns one column, hinged at the spine: the crease limits
+            // are measured against that leaf, not the whole captured page.
+            columns: viewSettings.vertical ? 1 : (currentView.renderer.columnCount ?? 1),
             visualOriginDistance: 0,
             progress: 0,
             grabY: 0.5,
+            pivot,
+            finger: { ...pivot },
             releaseSamples: [{ distance: 0, time: 0 }],
             lastMovementTime: 0,
           };
@@ -891,7 +973,12 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
           const beginning = controller.beginDrag(forward, viewSettings.rtl, style);
           // moveDrag buffers this initial sample even while native capture is
           // pending, then applies it before a queued release can settle.
-          controller.moveDrag(startedState.progress, startedState.grabY);
+          controller.moveDrag(
+            startedState.progress,
+            startedState.grabY,
+            dragFold(startedState),
+            dragRoll(startedState),
+          );
           beginning
             .then((ok) => {
               if (!ok) {
@@ -905,7 +992,7 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
           return true;
         }
         updateDragSample(state, detail, viewSettings?.rtl ?? false);
-        controller.moveDrag(state.progress, state.grabY);
+        controller.moveDrag(state.progress, state.grabY, dragFold(state), dragRoll(state));
         return true;
       }
 
@@ -921,7 +1008,7 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
       updateDragSample(state, detail, viewSettings?.rtl ?? false);
       // Store the release position before endDrag joins the controller's
       // serialized queue. This ordering also covers touchcancel.
-      controller.moveDrag(state.progress, state.grabY);
+      controller.moveDrag(state.progress, state.grabY, dragFold(state), dragRoll(state));
       if (detail.phase === 'cancel') {
         controller
           .endDrag(false)
@@ -935,7 +1022,9 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
       // Slide and push project the release velocity forward over a short
       // horizon: distance and speed contribute continuously instead of
       // crossing two independent hard thresholds. Curl preserves the existing
-      // whole-gesture 0.3px/ms-or-halfway rule.
+      // whole-gesture 0.3px/ms-or-halfway rule — and it reads that halfway off
+      // the gesture distance, NOT the painted sweep, which for a fold only
+      // covers half of it.
       const releaseProgress = Math.max(0, Math.min(1, signed / state.width));
       const projectedProgress =
         releaseProgress + (releaseVelocity * SLIDE_RELEASE_PROJECTION_MS) / state.width;
@@ -944,7 +1033,7 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
           ? projectedProgress > 0.5
           : fullGestureVelocity > 0.3
             ? true
-            : state.progress > 0.5;
+            : releaseProgress > 0.5;
       // CapturedPageTurn serializes endDrag behind an in-flight beginDrag, so
       // queue release immediately. This also keeps a following gesture behind
       // the complete begin/end pair instead of letting it supersede the turn.
@@ -960,12 +1049,24 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
 };
 
 const dragProgress = (state: DragState, deltaX: number, rtl: boolean) => {
+  if (state.style === 'curl') {
+    // The curl's sweep is wherever the solved crease actually is. The fold
+    // only travels half the finger's motion, so this is a different number
+    // from the gesture distance the release intent uses — but it is the one
+    // the sheet is painted at, and the settle starts from it.
+    return (
+      curlFoldFromFinger(state.width, state.height, {
+        finger: state.finger,
+        corner: state.pivot,
+      })?.progress ?? 0
+    );
+  }
   const signed = dragDistance(state, deltaX, rtl);
   // Slide and push start visually flat at the claim point, avoiding a
   // first-frame jump by the distance consumed during gesture recognition.
   // Release intent is calculated separately from the full touchstart-relative
   // distance.
-  const visualDistance = state.style !== 'curl' ? signed - state.visualOriginDistance : signed;
+  const visualDistance = signed - state.visualOriginDistance;
   return Math.max(0, Math.min(1, visualDistance / state.width));
 };
 
@@ -1009,9 +1110,30 @@ const dragDistance = (state: DragState, deltaX: number, rtl: boolean) => {
 
 const updateDragSample = (state: DragState, detail: TouchDetail, rtl: boolean) => {
   const distance = dragDistance(state, detail.deltaX, rtl);
+  const rawFinger: CurlGrab = {
+    x: state.pivot.x + detail.deltaX / state.width,
+    y: state.pivot.y + detail.deltaY / state.height,
+  };
+  // A forward crease may not run off to the far side of the sheet: a finger
+  // that strays gets pulled back along its own ray, and a stray with no legal
+  // crease at all folds nothing (see clampCurlFinger). Reversing the page is
+  // held to its own, always-vertical crease instead. The raw gesture distance
+  // below is untouched, so the release intent still sees the whole drag.
+  state.finger =
+    state.style === 'curl'
+      ? state.forward
+        ? clampCurlFinger(
+            state.width,
+            state.height,
+            { finger: rawFinger, corner: state.pivot },
+            curlLimitOptions(state),
+          )
+        : backwardFinger(state, rawFinger)
+      : rawFinger;
   state.progress = dragProgress(state, detail.deltaX, rtl);
   // The fold tilts as the finger strays vertically, curling corners like a
-  // real page pinch.
+  // real page pinch. Only the swept styles read it; a curl takes its crease
+  // angle from the finger itself.
   state.grabY = Math.max(0.05, Math.min(0.95, 0.5 + detail.deltaY / state.height));
 
   const time = Math.max(0, detail.deltaT);
