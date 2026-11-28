@@ -124,6 +124,19 @@ export class ReaderPage extends BasePage {
     return match ? Number(match[1]) : Number.NaN;
   }
 
+  /**
+   * The fraction of the book the reader last relocated to. While the slider
+   * moves, the page label shows the page under it before the jump runs; this
+   * changes only once the jump lands.
+   */
+  async locationFraction(): Promise<number> {
+    return this.foliateView.evaluate(
+      (view) =>
+        (view as HTMLElement & { lastLocation?: { fraction?: number } }).lastLocation?.fraction ??
+        Number.NaN,
+    );
+  }
+
   /** Jump to a page by typing into the footer's page-jump input. */
   async goToPage(page: number): Promise<void> {
     await this.revealFooter();
@@ -141,10 +154,19 @@ export class ReaderPage extends BasePage {
     await this.sidebar.waitFor({ state: 'visible' });
   }
 
+  /**
+   * Open the sidebar on one of its tabs. On a phone, tapping the tab that is
+   * already shown closes the sidebar, so a shown tab is left alone.
+   */
+  private async openSidebarTab(name: 'TOC' | 'Annotate'): Promise<void> {
+    await this.openSidebar();
+    const tab = this.sidebar.locator(`[aria-label="${name}"]`);
+    if ((await tab.getAttribute('aria-pressed')) !== 'true') await tab.click();
+  }
+
   /** Open the sidebar and navigate to the TOC chapter at the given index. */
   async openTocChapter(index: number): Promise<void> {
-    await this.openSidebar();
-    await this.sidebar.locator('[aria-label="TOC"]').click();
+    await this.openSidebarTab('TOC');
     await this.tocItems.nth(index).click();
   }
 
@@ -581,8 +603,7 @@ export class ReaderPage extends BasePage {
   async openAnnotationsTab(): Promise<void> {
     await this.dismissPopup();
     await this.closeNotebook();
-    await this.openSidebar();
-    await this.sidebar.locator('[aria-label="Annotate"]').click();
+    await this.openSidebarTab('Annotate');
   }
 
   /** Delete the first annotation from the sidebar's "Annotate" tab. */

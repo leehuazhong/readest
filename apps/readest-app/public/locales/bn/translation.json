@@ -257,7 +257,6 @@
   "Reading Progress Style": "পড়ার অগ্রগতির স্টাইল",
   "Page Number": "পৃষ্ঠা নম্বর",
   "Percentage": "শতাংশ",
-  "Screen": "স্ক্রিন",
   "Orientation": "দিকবিন্যাস",
   "Portrait": "পোর্ট্রেট",
   "Landscape": "ল্যান্ডস্কেপ",
@@ -2872,7 +2871,6 @@
   "Oldest Added": "সবচেয়ে পুরনো যোগ",
   "Alphabetical A-Z": "বর্ণানুক্রমে A-Z",
   "Alphabetical Z-A": "বর্ণানুক্রমে Z-A",
-  "All Languages": "সব ভাষা",
   "Pin to Notebook": "নোটবুকে পিন করুন",
   "Look up a word to see its definitions here.": "এখানে সংজ্ঞা দেখতে একটি শব্দ খুঁজুন।",
   "Add Audio to Anki Cards": "Anki কার্ডে অডিও যোগ করুন",
@@ -3067,5 +3065,14 @@
   "Over 50,000 free ebooks": "৫০,০০০-এরও বেশি বিনামূল্যের ই-বুক",
   "Free ebooks from authors who have \"unglued\" their books": "যেসব লেখক তাঁদের বই “মুক্ত” করেছেন তাঁদের বিনামূল্যের ই-বুক",
   "Free public-domain books, comics, magazines and puzzles": "পাবলিক ডোমেইনের বিনামূল্যের বই, কমিক্স, পত্রিকা ও ধাঁধা",
-  "Sync Settings": "সিঙ্ক সেটিংস"
+  "Sync Settings": "সিঙ্ক সেটিংস",
+  "Share as QR Code": "QR কোড হিসেবে শেয়ার করুন",
+  "Show a QR code for the selected text": "নির্বাচিত লেখার QR কোড দেখান",
+  "Select a shorter passage to share as a QR code.": "QR কোড হিসেবে শেয়ার করতে আরও ছোট অংশ নির্বাচন করুন।",
+  "QR code for the selected text": "নির্বাচিত লেখার QR কোড",
+  "Navigation History": "নেভিগেশন ইতিহাস",
+  "Highlight Current Paragraph": "বর্তমান অনুচ্ছেদ হাইলাইট করুন",
+  "Highlight Button": "হাইলাইট বোতাম",
+  "Export to Anki puts this dictionary's entry on the back of each card": "Anki-তে রপ্তানি প্রতিটি কার্ডের পেছনে এই অভিধানের ভুক্তি যোগ করে",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "অভিধানের ভুক্তি খোঁজা হচ্ছে ({{done}}/{{total}})…"
 }

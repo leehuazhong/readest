@@ -244,7 +244,6 @@
   "List": "Danh sách",
   "Grid": "Lưới",
   "Link Color": "Màu liên kết",
-  "Screen": "Màn hình",
   "Orientation": "Định hướng",
   "Portrait": "Chân dung",
   "Landscape": "Phong cảnh",
@@ -2799,7 +2798,6 @@
   "Oldest Added": "Thêm cũ nhất",
   "Alphabetical A-Z": "Theo bảng chữ cái A-Z",
   "Alphabetical Z-A": "Theo bảng chữ cái Z-A",
-  "All Languages": "Tất cả ngôn ngữ",
   "Pin to Notebook": "Ghim vào sổ ghi chép",
   "Look up a word to see its definitions here.": "Tra một từ để xem định nghĩa của nó tại đây.",
   "Add Audio to Anki Cards": "Thêm âm thanh vào thẻ Anki",
@@ -2988,5 +2986,14 @@
   "Over 50,000 free ebooks": "Hơn 50.000 sách điện tử miễn phí",
   "Free ebooks from authors who have \"unglued\" their books": "Sách điện tử miễn phí từ các tác giả đã “giải phóng” sách của họ",
   "Free public-domain books, comics, magazines and puzzles": "Sách, truyện tranh, tạp chí và câu đố miễn phí thuộc phạm vi công cộng",
-  "Sync Settings": "Cài đặt đồng bộ"
+  "Sync Settings": "Cài đặt đồng bộ",
+  "Share as QR Code": "Chia sẻ dưới dạng mã QR",
+  "Show a QR code for the selected text": "Hiển thị mã QR cho văn bản đã chọn",
+  "Select a shorter passage to share as a QR code.": "Hãy chọn đoạn ngắn hơn để chia sẻ dưới dạng mã QR.",
+  "QR code for the selected text": "Mã QR cho văn bản đã chọn",
+  "Navigation History": "Lịch sử điều hướng",
+  "Highlight Current Paragraph": "Tô sáng đoạn hiện tại",
+  "Highlight Button": "Nút đánh dấu",
+  "Export to Anki puts this dictionary's entry on the back of each card": "Xuất sang Anki sẽ đặt mục từ của từ điển này ở mặt sau mỗi thẻ",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "Đang tra mục từ trong từ điển ({{done}}/{{total}})…"
 }

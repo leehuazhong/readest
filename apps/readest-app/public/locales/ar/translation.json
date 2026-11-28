@@ -242,7 +242,6 @@
   "List": "قائمة",
   "Grid": "شبكة",
   "Link Color": "لون الرابط",
-  "Screen": "الشاشة",
   "Orientation": "الاتجاه",
   "Portrait": "عمودي",
   "Landscape": "أفقي",
@@ -3164,7 +3163,6 @@
   "Oldest Added": "الأقدم إضافة",
   "Alphabetical A-Z": "أبجديًا A-Z",
   "Alphabetical Z-A": "أبجديًا Z-A",
-  "All Languages": "كل اللغات",
   "Pin to Notebook": "تثبيت في المفكرة",
   "Look up a word to see its definitions here.": "ابحث عن كلمة لترى تعريفاتها هنا.",
   "Add Audio to Anki Cards": "إضافة صوت إلى بطاقات Anki",
@@ -3383,5 +3381,14 @@
   "Over 50,000 free ebooks": "أكثر من 50 ألف كتاب إلكتروني مجاني",
   "Free ebooks from authors who have \"unglued\" their books": "كتب إلكترونية مجانية من مؤلفين «حرّروا» كتبهم",
   "Free public-domain books, comics, magazines and puzzles": "كتب وقصص مصورة ومجلات وألغاز مجانية من الملك العام",
-  "Sync Settings": "إعدادات المزامنة"
+  "Sync Settings": "إعدادات المزامنة",
+  "Share as QR Code": "مشاركة كرمز QR",
+  "Show a QR code for the selected text": "عرض رمز QR للنص المحدد",
+  "Select a shorter passage to share as a QR code.": "حدّد مقطعًا أقصر لمشاركته كرمز QR.",
+  "QR code for the selected text": "رمز QR للنص المحدد",
+  "Navigation History": "سجل التنقل",
+  "Highlight Current Paragraph": "تمييز الفقرة الحالية",
+  "Highlight Button": "زر التمييز",
+  "Export to Anki puts this dictionary's entry on the back of each card": "يضع التصدير إلى Anki مدخل هذا القاموس على ظهر كل بطاقة",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "جارٍ البحث عن مداخل القاموس ({{done}}/{{total}})…"
 }

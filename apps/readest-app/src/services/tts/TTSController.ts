@@ -54,6 +54,7 @@ import {
   MediaOverlaySection,
   MediaOverlayTTS,
   MEDIA_OVERLAY_VOICE_ID,
+  paragraphRangeOf,
 } from './mediaOverlay';
 import {
   adjacentAudioChapter,
@@ -94,6 +95,9 @@ const PRELOAD_AHEAD_SEC = 180;
 const PRELOAD_MAX_PARAGRAPHS = 40;
 // Preload the next paragraphs this long after a paragraph starts at the latest.
 const PRELOAD_NEXT_AFTER_MS = 500;
+// A wait for first audio shorter than this is an engine's ordinary start (a
+// system voice takes up to ~0.6 s for any utterance), not buffering (#8037).
+const BUFFERING_SHOWN_AFTER_MS = 1000;
 // How long a paused session keeps the audio keep-alive, as long as Media3
 // keeps a paused player in the foreground.
 const PAUSED_KEEP_ALIVE_MS = 10 * 60 * 1000;
@@ -216,6 +220,9 @@ export class TTSController extends EventTarget {
   #currentSpeakPromise: Promise<void> | null = null;
 
   #ttsSectionIndex: number = -1;
+  // The section #tts reads. #ttsSectionIndex moves first, while the next
+  // section opens.
+  #ttsTextSectionIndex = -1;
 
   // Virtual section timeline for position/duration/seek (Edge client only).
   // Built lazily OFF the playback critical path: enumerating a 2000-sentence
@@ -227,8 +234,9 @@ export class TTSController extends EventTarget {
   // heard from it yet — synthesis, network, decode, or a recording still
   // loading. The first event the speak() iterator yields IS the first audible
   // chunk (see BufferedTTSClient/MediaOverlayClient), so it is the only signal
-  // needed here. Surfaced as isBuffering() for the player's spinner.
-  #awaitingAudio = false;
+  // needed here. Surfaced as isBuffering() for the player's spinner. Holds
+  // when the wait began, null when nothing is awaited.
+  #awaitingAudioSince: number | null = null;
   // Opening paragraphs (raw SSML) of what is read after the current document
   // (the next chunk of a chunked section, else the next section), for preloads
   // across its end; built once per document read.
@@ -564,6 +572,7 @@ export class TTSController extends EventTarget {
     }
     this.#tts = newTts;
     this.view.tts = newTts;
+    this.#ttsTextSectionIndex = sectionIndex;
     if (this.#ttsDoc !== doc) this.#ttsDocSheet++;
     this.#ttsDoc = doc;
     if (narration) {
@@ -968,6 +977,7 @@ export class TTSController extends EventTarget {
     if (existing && existing.doc === doc) {
       this.#tts = existing;
       this.view.tts = existing;
+      this.#ttsTextSectionIndex = sectionIndex;
       return true;
     }
 
@@ -979,6 +989,7 @@ export class TTSController extends EventTarget {
         this.#ttsGranularity = 'sentence';
         this.#tts = new MediaOverlayTTS(doc, narration, this.#getHighlighter());
         this.view.tts = this.#tts;
+        this.#ttsTextSectionIndex = sectionIndex;
         console.log(`[TTS] Initialized narration for section ${sectionIndex}`);
         return true;
       }
@@ -1008,6 +1019,7 @@ export class TTSController extends EventTarget {
       granularity,
     );
     this.view.tts = this.#tts;
+    this.#ttsTextSectionIndex = sectionIndex;
     console.log(`[TTS] Initialized TTS for section ${sectionIndex}`);
 
     return true;
@@ -1286,10 +1298,14 @@ export class TTSController extends EventTarget {
     return range ? timeline.indexOfRange(range) : -1;
   }
 
-  // Playing, but nothing audible yet: synthesis, network, decode, or a
-  // recording still loading. Drives the spinner in the lyric play button.
+  // Playing, but nothing audible for a while: synthesis, network, decode, or
+  // a recording still loading. Drives the spinner in the lyric play button.
   isBuffering(): boolean {
-    return this.#awaitingAudio && this.state === 'playing';
+    return (
+      this.#awaitingAudioSince !== null &&
+      this.state === 'playing' &&
+      Date.now() - this.#awaitingAudioSince >= BUFFERING_SHOWN_AFTER_MS
+    );
   }
 
   // Start speaking at a lyric line. Unlike the scrubber's seek this always
@@ -1342,7 +1358,7 @@ export class TTSController extends EventTarget {
     this.ttsCustomClient.setSentenceGap(sec);
   }
 
-  // Universal (not Edge-only) paragraph-to-paragraph gap, in wall-clock
+  // Paragraph-to-paragraph gap of every synthesized voice, in wall-clock
   // seconds at the current rate. See DEFAULT_PARAGRAPH_GAP_SEC and
   // #delayParagraphGap for where it's applied.
   setParagraphGap(sec: number): void {
@@ -1366,6 +1382,11 @@ export class TTSController extends EventTarget {
   async #delayParagraphGap(signal: AbortSignal): Promise<void> {
     const capabilities = this.ttsClient.getCapabilities();
     if (capabilities.continuousTimeline) return;
+    // A system voice (the OS renders the audio) takes its own ~0.2-0.6 s to
+    // start every utterance, which already reads as a pause. Sleeping the gap
+    // on top made paragraph starts pause about twice as long as with any other
+    // engine (#8037).
+    if (!capabilities.gapControl) return;
     // Already scheduled as silence on the client's own audio clock, with the
     // next paragraph's synthesis and decode running inside it. Sleeping here
     // too would play the pause twice and put that latency back on top (#5750).
@@ -1906,7 +1927,7 @@ export class TTSController extends EventTarget {
       try {
         console.log('[TTS] speak');
         this.state = 'playing';
-        this.#awaitingAudio = true;
+        this.#awaitingAudioSince = Date.now();
         this.#syncAudioKeepAlive();
 
         signal.addEventListener('abort', () => {
@@ -1985,7 +2006,7 @@ export class TTSController extends EventTarget {
           // Anything the iterator yields means the client is done waiting:
           // 'boundary' is the first audible chunk, 'end'/'error' resolve the
           // wait the other way.
-          this.#awaitingAudio = false;
+          this.#awaitingAudioSince = null;
           if (signal.aborted) {
             resolve();
             return;
@@ -2326,7 +2347,7 @@ export class TTSController extends EventTarget {
   }
 
   async stop(handover = false) {
-    this.#awaitingAudio = false;
+    this.#awaitingAudioSince = null;
     // A handover (the next paragraph starting) keeps them: they are its audio.
     if (!handover) this.#withdrawPreloads();
     if (this.#currentSpeakAbortController) {
@@ -2588,9 +2609,27 @@ export class TTSController extends EventTarget {
     this.ttsTargetLang = lang;
   }
 
+  // Whether the sentence being read is known: a paired audiobook knows only
+  // the chapter playing (#6060).
+  get supportsPassageHighlight(): boolean {
+    return this.ttsClient.getCapabilities().textHighlight !== false;
+  }
+
   getSpokenSentence(): { cfi: string; text: string } | null {
-    const range = this.#getTts()?.getLastRange();
-    if (!range || this.#ttsSectionIndex < 0) return null;
+    return this.#getSpokenText('sentence');
+  }
+
+  getSpokenParagraph(): { cfi: string; text: string } | null {
+    return this.#getSpokenText('paragraph');
+  }
+
+  #getSpokenText(unit: 'sentence' | 'paragraph'): { cfi: string; text: string } | null {
+    if (!this.supportsPassageHighlight || this.#ttsSectionIndex < 0) return null;
+    // While the next section opens, the range is still the outgoing one's.
+    if (this.#ttsTextSectionIndex !== this.#ttsSectionIndex) return null;
+    let range = this.#getTts()?.getLastRange();
+    if (range && unit === 'paragraph') range = paragraphRangeOf(range) ?? range;
+    if (!range) return null;
     try {
       const cfi = this.view.getCFI(this.#ttsSectionIndex, range);
       const text = range.toString().trim();

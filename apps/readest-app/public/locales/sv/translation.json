@@ -488,7 +488,6 @@
   "Reading Progress Style": "Läsframstegsstil",
   "Page Number": "Sidnummer",
   "Percentage": "Procent",
-  "Screen": "Skärm",
   "Orientation": "Orientering",
   "Portrait": "Porträtt",
   "Landscape": "Landskap",
@@ -2872,7 +2871,6 @@
   "Oldest Added": "Först tillagda",
   "Alphabetical A-Z": "Alfabetisk A–Ö",
   "Alphabetical Z-A": "Alfabetisk Ö–A",
-  "All Languages": "Alla språk",
   "Pin to Notebook": "Fäst i anteckningsboken",
   "Look up a word to see its definitions here.": "Slå upp ett ord för att se dess definitioner här.",
   "Add Audio to Anki Cards": "Lägg till ljud på Anki-kort",
@@ -3067,5 +3065,14 @@
   "Over 50,000 free ebooks": "Över 50 000 gratis e-böcker",
   "Free ebooks from authors who have \"unglued\" their books": "Gratis e-böcker från författare som har ”frigjort” sina böcker",
   "Free public-domain books, comics, magazines and puzzles": "Gratis böcker, serier, tidskrifter och pussel i public domain",
-  "Sync Settings": "Synkronisering"
+  "Sync Settings": "Synkronisering",
+  "Share as QR Code": "Dela som QR-kod",
+  "Show a QR code for the selected text": "Visa en QR-kod för den markerade texten",
+  "Select a shorter passage to share as a QR code.": "Markera ett kortare stycke för att dela det som QR-kod.",
+  "QR code for the selected text": "QR-kod för den markerade texten",
+  "Navigation History": "Navigeringshistorik",
+  "Highlight Current Paragraph": "Markera aktuellt stycke",
+  "Highlight Button": "Markeringsknapp",
+  "Export to Anki puts this dictionary's entry on the back of each card": "Export till Anki lägger den här ordbokens uppslag på baksidan av varje kort",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "Slår upp ordboksuppslag ({{done}}/{{total}})…"
 }

@@ -133,7 +133,12 @@ const XRayView: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     return groups;
   }, [xray]);
 
-  if (!xray) return <XRayStatus bookKey={bookKey} word={lookup?.word} />;
+  if (!xray)
+    return (
+      <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain'>
+        <XRayStatus bookKey={bookKey} word={lookup?.word} />
+      </div>
+    );
 
   const sections: Section[] = [...XRAY_ENTITY_TYPES.filter((type) => byType.has(type)), 'timeline'];
   const matches = filter
@@ -159,7 +164,7 @@ const XRayView: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           />
         </label>
         {!filter && (
-          <div className='flex gap-1 overflow-x-auto' role='group' aria-label={_('X-Ray')}>
+          <div className='flex flex-wrap gap-1' role='group' aria-label={_('X-Ray')}>
             {sections.map((id) => (
               <button
                 key={id}

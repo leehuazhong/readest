@@ -572,7 +572,6 @@
   "Reading Progress Style": "Gaya Kemajuan Membaca",
   "Page Number": "Nombor Halaman",
   "Percentage": "Peratusan",
-  "Screen": "Skrin",
   "Orientation": "Orientasi",
   "Portrait": "Potret",
   "Landscape": "Landskap",
@@ -2799,7 +2798,6 @@
   "Oldest Added": "Terlama ditambah",
   "Alphabetical A-Z": "Abjad A-Z",
   "Alphabetical Z-A": "Abjad Z-A",
-  "All Languages": "Semua bahasa",
   "Pin to Notebook": "Pin ke buku nota",
   "Look up a word to see its definitions here.": "Cari sesuatu perkataan untuk melihat definisinya di sini.",
   "Add Audio to Anki Cards": "Tambah Audio pada Kad Anki",
@@ -2988,5 +2986,14 @@
   "Over 50,000 free ebooks": "Lebih 50,000 e-buku percuma",
   "Free ebooks from authors who have \"unglued\" their books": "E-buku percuma yang telah “dibebaskan” oleh pengarangnya",
   "Free public-domain books, comics, magazines and puzzles": "Buku, komik, majalah dan teka-teki domain awam percuma",
-  "Sync Settings": "Tetapan Segerak"
+  "Sync Settings": "Tetapan Segerak",
+  "Share as QR Code": "Kongsi sebagai kod QR",
+  "Show a QR code for the selected text": "Tunjukkan kod QR untuk teks yang dipilih",
+  "Select a shorter passage to share as a QR code.": "Pilih petikan yang lebih pendek untuk dikongsi sebagai kod QR.",
+  "QR code for the selected text": "Kod QR untuk teks yang dipilih",
+  "Navigation History": "Sejarah navigasi",
+  "Highlight Current Paragraph": "Serlahkan perenggan semasa",
+  "Highlight Button": "Butang tonjolkan",
+  "Export to Anki puts this dictionary's entry on the back of each card": "Eksport ke Anki meletakkan entri kamus ini di belakang setiap kad",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "Mencari entri kamus ({{done}}/{{total}})…"
 }

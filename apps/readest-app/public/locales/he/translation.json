@@ -920,7 +920,6 @@
   "Page Number": "מספר דף",
   "Percentage": "אחוזים",
   "Use 24 Hour Clock": "השתמש בשעון 24 שעות",
-  "Screen": "מסך",
   "Orientation": "כיוון מסך (Orientation)",
   "Portrait": "לאורך (Portrait)",
   "Landscape": "לרוחב (Landscape)",
@@ -2945,7 +2944,6 @@
   "Oldest Added": "נוספו ראשונים",
   "Alphabetical A-Z": "אלפביתי A-Z",
   "Alphabetical Z-A": "אלפביתי Z-A",
-  "All Languages": "כל השפות",
   "Pin to Notebook": "הצמדה למחברת",
   "Look up a word to see its definitions here.": "חפשו מילה כדי לראות כאן את ההגדרות שלה.",
   "Add Audio to Anki Cards": "הוספת שמע לכרטיסי Anki",
@@ -3146,5 +3144,14 @@
   "Over 50,000 free ebooks": "יותר מ־50,000 ספרים אלקטרוניים חינמיים",
   "Free ebooks from authors who have \"unglued\" their books": "ספרים אלקטרוניים חינמיים מסופרים ששחררו את ספריהם לציבור",
   "Free public-domain books, comics, magazines and puzzles": "ספרים, קומיקס, מגזינים וחידות חינמיים בנחלת הכלל",
-  "Sync Settings": "הגדרות סנכרון"
+  "Sync Settings": "הגדרות סנכרון",
+  "Share as QR Code": "שיתוף כקוד QR",
+  "Show a QR code for the selected text": "הצגת קוד QR עבור הטקסט שנבחר",
+  "Select a shorter passage to share as a QR code.": "יש לבחור קטע קצר יותר כדי לשתף אותו כקוד QR.",
+  "QR code for the selected text": "קוד QR עבור הטקסט שנבחר",
+  "Navigation History": "היסטוריית ניווט",
+  "Highlight Current Paragraph": "הדגשת הפסקה הנוכחית",
+  "Highlight Button": "כפתור הדגשה",
+  "Export to Anki puts this dictionary's entry on the back of each card": "הייצוא ל-Anki מוסיף את הערך של המילון הזה לגב כל כרטיס",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "מחפש ערכים במילון ({{done}}/{{total}})…"
 }

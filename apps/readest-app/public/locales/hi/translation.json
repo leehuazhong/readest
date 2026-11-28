@@ -244,7 +244,6 @@
   "List": "सूची",
   "Grid": "ग्रिड",
   "Link Color": "लिंक रंग",
-  "Screen": "स्क्रीन",
   "Orientation": "अवयव",
   "Portrait": "पोर्ट्रेट",
   "Landscape": "लैंडस्केप",
@@ -2872,7 +2871,6 @@
   "Oldest Added": "सबसे पुराने जोड़े गए",
   "Alphabetical A-Z": "वर्णानुक्रम A-Z",
   "Alphabetical Z-A": "वर्णानुक्रम Z-A",
-  "All Languages": "सभी भाषाएँ",
   "Pin to Notebook": "नोटबुक में पिन करें",
   "Look up a word to see its definitions here.": "किसी शब्द को खोजें, उसकी परिभाषाएँ यहाँ दिखेंगी।",
   "Add Audio to Anki Cards": "Anki कार्ड में ऑडियो जोड़ें",
@@ -3067,5 +3065,14 @@
   "Over 50,000 free ebooks": "50,000 से अधिक मुफ़्त ई-बुक्स",
   "Free ebooks from authors who have \"unglued\" their books": "उन लेखकों की मुफ़्त ई-बुक्स जिन्होंने अपनी किताबें “मुक्त” कर दी हैं",
   "Free public-domain books, comics, magazines and puzzles": "सार्वजनिक डोमेन की मुफ़्त किताबें, कॉमिक्स, पत्रिकाएँ और पहेलियाँ",
-  "Sync Settings": "सिंक सेटिंग्स"
+  "Sync Settings": "सिंक सेटिंग्स",
+  "Share as QR Code": "QR कोड के रूप में साझा करें",
+  "Show a QR code for the selected text": "चयनित टेक्स्ट का QR कोड दिखाएँ",
+  "Select a shorter passage to share as a QR code.": "QR कोड के रूप में साझा करने के लिए छोटा अंश चुनें।",
+  "QR code for the selected text": "चयनित टेक्स्ट का QR कोड",
+  "Navigation History": "नेविगेशन इतिहास",
+  "Highlight Current Paragraph": "वर्तमान पैराग्राफ को हाइलाइट करें",
+  "Highlight Button": "हाइलाइट बटन",
+  "Export to Anki puts this dictionary's entry on the back of each card": "Anki में निर्यात हर कार्ड के पीछे इस शब्दकोश की प्रविष्टि जोड़ता है",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "शब्दकोश की प्रविष्टियाँ खोजी जा रही हैं ({{done}}/{{total}})…"
 }

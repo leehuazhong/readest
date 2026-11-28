@@ -215,7 +215,6 @@
   "Header & Footer": "หัวกระดาษและท้ายกระดาษ",
   "Show Header": "แสดงหัวกระดาษ",
   "Show Footer": "แสดงท้ายกระดาษ",
-  "Screen": "หน้าจอ",
   "Orientation": "การวางแนว",
   "Portrait": "แนวตั้ง",
   "Landscape": "แนวนอน",
@@ -2799,7 +2798,6 @@
   "Oldest Added": "เพิ่มเก่าสุด",
   "Alphabetical A-Z": "ตามตัวอักษร A-Z",
   "Alphabetical Z-A": "ตามตัวอักษร Z-A",
-  "All Languages": "ทุกภาษา",
   "Pin to Notebook": "ตรึงไว้ที่สมุดบันทึก",
   "Look up a word to see its definitions here.": "ค้นหาคำเพื่อดูความหมายของคำนั้นที่นี่",
   "Add Audio to Anki Cards": "เพิ่มเสียงในการ์ด Anki",
@@ -2988,5 +2986,14 @@
   "Over 50,000 free ebooks": "อีบุ๊กฟรีมากกว่า 50,000 เล่ม",
   "Free ebooks from authors who have \"unglued\" their books": "อีบุ๊กฟรีจากนักเขียนที่ “ปลดปล่อย” หนังสือของตน",
   "Free public-domain books, comics, magazines and puzzles": "หนังสือ การ์ตูน นิตยสาร และปริศนาสาธารณสมบัติฟรี",
-  "Sync Settings": "การตั้งค่าการซิงค์"
+  "Sync Settings": "การตั้งค่าการซิงค์",
+  "Share as QR Code": "แชร์เป็นคิวอาร์โค้ด",
+  "Show a QR code for the selected text": "แสดงคิวอาร์โค้ดของข้อความที่เลือก",
+  "Select a shorter passage to share as a QR code.": "เลือกข้อความที่สั้นลงเพื่อแชร์เป็นคิวอาร์โค้ด",
+  "QR code for the selected text": "คิวอาร์โค้ดของข้อความที่เลือก",
+  "Navigation History": "ประวัติการนำทาง",
+  "Highlight Current Paragraph": "ไฮไลต์ย่อหน้าปัจจุบัน",
+  "Highlight Button": "ปุ่มไฮไลต์",
+  "Export to Anki puts this dictionary's entry on the back of each card": "การส่งออกไปยัง Anki จะใส่คำอธิบายจากพจนานุกรมนี้ไว้ด้านหลังการ์ดแต่ละใบ",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "กำลังค้นหาคำอธิบายในพจนานุกรม ({{done}}/{{total}})…"
 }

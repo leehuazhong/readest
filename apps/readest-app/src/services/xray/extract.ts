@@ -105,6 +105,7 @@ const ask = async (
   system: string,
   prompt: string,
   signal: AbortSignal,
+  maxOutputTokens?: number,
 ): Promise<string> => {
   signal.throwIfAborted();
   // Our own controller: tauriFetch leaves an unhandled rejection when the
@@ -117,8 +118,11 @@ const ask = async (
     const text = await generateChatText(translator, {
       system,
       prompt,
+      maxOutputTokens,
       maxRetries: 1,
       abortSignal: controller.signal,
+      // Local models often break the JSON without it, closing a string with a curly quote.
+      json: true,
       onText: () => {},
       onProgress: (type) => {
         // The SDK starts its stream before the server takes the request.
@@ -148,10 +152,11 @@ export const extractXRay = async (
   known: readonly string[],
   input: XRayExtractInput,
   signal: AbortSignal,
+  maxOutputTokens?: number,
 ): Promise<XRayData> => {
   const prompt = JSON.stringify({ known, passages: passages.map(({ text }) => text) });
   const reply = stripReasoning(
-    await ask(translator, renderPrompt(XRAY_PROMPT, input), prompt, signal),
+    await ask(translator, renderPrompt(XRAY_PROMPT, input), prompt, signal, maxOutputTokens),
   );
   const [{ parsePartialJson }] = await loadSDK();
   // A reply cut off at the output limit still keeps its complete items.

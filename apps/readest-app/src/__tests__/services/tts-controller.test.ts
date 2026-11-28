@@ -1257,6 +1257,36 @@ describe('TTSController', () => {
     });
   });
 
+  test('does not save the outgoing text under the next section while it opens', async () => {
+    await controller.initViewTTS(0);
+    vi.mocked(mockView.tts!.next).mockReturnValue(undefined);
+    vi.mocked(mockView.tts!.getLastRange).mockReturnValue({
+      toString: () => 'Outgoing passage',
+    } as Range);
+    expect(controller.getSpokenSentence()?.text).toBe('Outgoing passage');
+
+    let releaseSection!: () => void;
+    const opening = new Promise<void>((resolve) => {
+      releaseSection = resolve;
+    });
+    let notifyOpening!: () => void;
+    const startedOpening = new Promise<void>((resolve) => {
+      notifyOpening = resolve;
+    });
+    controller.onSectionChange = async () => {
+      notifyOpening();
+      await opening;
+    };
+    const advancing = controller.forward();
+    await startedOpening;
+    try {
+      expect(controller.getSpokenSentence()).toBeNull();
+    } finally {
+      releaseSection();
+      await advancing;
+    }
+  });
+
   describe('getSpokenSentence', () => {
     test('returns the trimmed text and cfi of the current sentence', async () => {
       await controller.initViewTTS(0);
@@ -1305,6 +1335,60 @@ describe('TTSController', () => {
       vi.mocked(mockView.getCFI).mockReturnValue('cfi-current');
 
       expect(controller.getSpokenSentence()).toBeNull();
+    });
+
+    // A paired audiobook knows only which chapter plays; its range is the
+    // whole mapped chapter (#6060).
+    test('returns null for a paired audiobook', async () => {
+      await controller.initViewTTS(0);
+      mockView.tts = {
+        getLastRange: vi.fn().mockReturnValue({ toString: () => 'A whole mapped chapter.' }),
+      } as unknown as FoliateView['tts'];
+      vi.mocked(mockView.getCFI).mockReturnValue('cfi-chapter');
+      controller.ttsClient.getCapabilities = vi.fn().mockReturnValue({
+        textHighlight: false,
+      }) as unknown as typeof controller.ttsClient.getCapabilities;
+
+      expect(controller.getSpokenSentence()).toBeNull();
+      expect(controller.getSpokenParagraph()).toBeNull();
+    });
+  });
+
+  describe('getSpokenParagraph', () => {
+    const speak = (html: string, select: (doc: Document) => Range) => {
+      const doc = document.implementation.createHTMLDocument();
+      doc.body.innerHTML = html;
+      mockView.tts = {
+        getLastRange: vi.fn().mockReturnValue(select(doc)),
+      } as unknown as FoliateView['tts'];
+      vi.mocked(mockView.getCFI).mockImplementation((_index, range) => `cfi:${range}`);
+    };
+
+    test('returns the paragraph the spoken sentence is in', async () => {
+      await controller.initViewTTS(0);
+      speak('<p>Before.</p><p>\n  First one. <em>Second</em> one.\n</p><p>After.</p>', (doc) => {
+        const range = doc.createRange();
+        range.selectNodeContents(doc.querySelector('em')!);
+        range.setEnd(doc.querySelector('em')!.nextSibling!, 5);
+        return range;
+      });
+
+      expect(controller.getSpokenParagraph()).toEqual({
+        cfi: 'cfi:First one. Second one.',
+        text: 'First one. Second one.',
+      });
+    });
+
+    // foliate reads a PDF text layer sentence by sentence; the layer is a page.
+    test('keeps the sentence in a PDF text layer', async () => {
+      await controller.initViewTTS(0);
+      speak('<div class="textLayer"><span>One line.</span><span>Next line.</span></div>', (doc) => {
+        const range = doc.createRange();
+        range.selectNodeContents(doc.querySelector('span')!.firstChild!);
+        return range;
+      });
+
+      expect(controller.getSpokenParagraph()?.text).toBe('One line.');
     });
   });
 
@@ -1607,6 +1691,30 @@ describe('TTSController', () => {
         gapControl: true,
         liveRateChange: false,
         scheduledGaps: true,
+      });
+      const forwardSpy = vi.spyOn(controller, 'forward').mockResolvedValue();
+      speakingControllers.push(controller);
+
+      await controller.speak('<speak>hello</speak>');
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(forwardSpy).toHaveBeenCalledWith(false, true);
+      vi.useRealTimers();
+    });
+
+    test('a system voice starts the next paragraph without sleeping the gap first', async () => {
+      // The OS engine takes its own ~0.2-0.6 s to start every utterance. The
+      // gap slept on top of that made paragraph starts pause about twice as
+      // long as with any other engine (#8037).
+      vi.useFakeTimers();
+      await controller.init();
+      await controller.initViewTTS(0);
+      controller.setParagraphGap(0.3);
+      controller.ttsClient.getCapabilities = vi.fn().mockReturnValue({
+        wordBoundaries: false,
+        mediaClock: false,
+        gapControl: false,
+        liveRateChange: false,
       });
       const forwardSpy = vi.spyOn(controller, 'forward').mockResolvedValue();
       speakingControllers.push(controller);

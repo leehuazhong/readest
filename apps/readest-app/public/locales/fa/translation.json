@@ -242,7 +242,6 @@
   "List": "لیست",
   "Grid": "جدول",
   "Link Color": "رنگ لینک",
-  "Screen": "صفحه",
   "Orientation": "جهت",
   "Portrait": "عمودی",
   "Landscape": "افقی",
@@ -2872,7 +2871,6 @@
   "Oldest Added": "قدیمی‌ترین افزوده‌ها",
   "Alphabetical A-Z": "الفبایی A تا Z",
   "Alphabetical Z-A": "الفبایی Z تا A",
-  "All Languages": "همه زبان‌ها",
   "Pin to Notebook": "سنجاق به دفترچه یادداشت",
   "Look up a word to see its definitions here.": "یک واژه را جست‌وجو کنید تا تعریف‌هایش اینجا نمایش داده شود.",
   "Add Audio to Anki Cards": "افزودن صدا به کارت‌های Anki",
@@ -3067,5 +3065,14 @@
   "Over 50,000 free ebooks": "بیش از ۵۰٬۰۰۰ کتاب الکترونیکی رایگان",
   "Free ebooks from authors who have \"unglued\" their books": "کتاب‌های الکترونیکی رایگان از نویسندگانی که کتاب‌هایشان را «آزاد» کرده‌اند",
   "Free public-domain books, comics, magazines and puzzles": "کتاب‌ها، کمیک‌ها، مجله‌ها و پازل‌های رایگان با مالکیت عمومی",
-  "Sync Settings": "تنظیمات همگام‌سازی"
+  "Sync Settings": "تنظیمات همگام‌سازی",
+  "Share as QR Code": "اشتراک‌گذاری به‌صورت کد QR",
+  "Show a QR code for the selected text": "نمایش کد QR برای متن انتخاب‌شده",
+  "Select a shorter passage to share as a QR code.": "برای اشتراک‌گذاری به‌صورت کد QR، بخش کوتاه‌تری را انتخاب کنید.",
+  "QR code for the selected text": "کد QR برای متن انتخاب‌شده",
+  "Navigation History": "تاریخچه پیمایش",
+  "Highlight Current Paragraph": "برجسته‌سازی پاراگراف فعلی",
+  "Highlight Button": "دکمه هایلایت",
+  "Export to Anki puts this dictionary's entry on the back of each card": "خروجی برای Anki مدخل این فرهنگ لغت را پشت هر کارت می‌گذارد",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "در حال جستجوی مدخل‌های فرهنگ لغت ({{done}}/{{total}})…"
 }

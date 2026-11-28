@@ -244,7 +244,6 @@
   "List": "목록",
   "Grid": "격자",
   "Link Color": "링크 색상",
-  "Screen": "화면",
   "Orientation": "방향",
   "Portrait": "세로",
   "Landscape": "가로",
@@ -2799,7 +2798,6 @@
   "Oldest Added": "오래된 추가순",
   "Alphabetical A-Z": "알파벳순 A-Z",
   "Alphabetical Z-A": "알파벳순 Z-A",
-  "All Languages": "모든 언어",
   "Pin to Notebook": "노트북에 고정",
   "Look up a word to see its definitions here.": "단어를 찾아보면 여기에 뜻이 표시됩니다.",
   "Add Audio to Anki Cards": "Anki 카드에 오디오 추가",
@@ -2988,5 +2986,14 @@
   "Over 50,000 free ebooks": "50,000권 이상의 무료 전자책",
   "Free ebooks from authors who have \"unglued\" their books": "저자들이 ‘해방’한 무료 전자책",
   "Free public-domain books, comics, magazines and puzzles": "퍼블릭 도메인 무료 도서, 만화, 잡지, 퍼즐",
-  "Sync Settings": "동기화 설정"
+  "Sync Settings": "동기화 설정",
+  "Share as QR Code": "QR 코드로 공유",
+  "Show a QR code for the selected text": "선택한 텍스트의 QR 코드 표시",
+  "Select a shorter passage to share as a QR code.": "QR 코드로 공유하려면 더 짧은 구절을 선택하세요.",
+  "QR code for the selected text": "선택한 텍스트의 QR 코드",
+  "Navigation History": "이동 기록",
+  "Highlight Current Paragraph": "현재 단락 강조",
+  "Highlight Button": "하이라이트 버튼",
+  "Export to Anki puts this dictionary's entry on the back of each card": "Anki로 내보내면 이 사전의 항목을 각 카드 뒷면에 넣습니다",
+  "Looking up dictionary entries ({{done}}/{{total}})…": "사전 항목 찾는 중 ({{done}}/{{total}})…"
 }
