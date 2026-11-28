@@ -71,7 +71,11 @@ vi.mock('@/store/readerProgressStore', () => {
     pageinfo: { current: 2, total: 5 },
     timeinfo: { section: 0, total: 0 },
   } as BookProgress;
-  return { useBookProgress: () => progress, getBookProgress: () => progress };
+  return {
+    useBookProgress: () => progress,
+    getBookProgress: () => progress,
+    usePagePreview: () => null,
+  };
 });
 vi.mock('@/store/bookDataStore', async () => {
   const { bookDataStoreHooks } = await import('@/__tests__/helpers/book-data-store-mock');

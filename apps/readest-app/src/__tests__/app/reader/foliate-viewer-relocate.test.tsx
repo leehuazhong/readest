@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import FoliateViewer from '@/app/reader/components/FoliateViewer';
 import { useFoliateEvents } from '@/app/reader/hooks/useFoliateEvents';
+import { setBookProgress, useReaderProgressStore } from '@/store/readerProgressStore';
+import type { BookProgress } from '@/types/book';
 
 const { setProgress, readerState, wipe, linked } = vi.hoisted(() => {
   const setProgress = vi.fn();
@@ -124,6 +126,11 @@ const props = {
 const relocate = (detail: object) => {
   const handlers = vi.mocked(useFoliateEvents).mock.lastCall?.[1];
   act(() => handlers?.onRelocate?.(new CustomEvent('relocate', { detail })));
+};
+
+const preview = (detail: object | null) => {
+  const handlers = vi.mocked(useFoliateEvents).mock.lastCall?.[1];
+  act(() => handlers?.onPreview?.(new CustomEvent('preview', { detail })));
 };
 
 const rendererRelocate = (detail: object) => {
@@ -267,6 +274,65 @@ describe('reader relocation during an Auto Scroll wipe', () => {
     wipe.ahead = false;
     wipe.commitRef?.current?.();
     expect(linked.goTo).not.toHaveBeenCalled();
+  });
+});
+
+// A native page turn paints the next page under its cover to capture it, with
+// the header and footer over it (#8068).
+describe('page preview under a native page turn', () => {
+  const tocItem = { label: 'Chapter 2', href: 'ch2.xhtml' };
+  const next = {
+    location: { current: 8, next: 10, total: 10 },
+    section: { current: 3, total: 4 },
+    time: { section: 0.5, total: 0.5 },
+    fraction: 1,
+    tocItem,
+    pageItem: null,
+    page: 4,
+    pages: 5,
+    atEnd: true,
+  };
+  const previewed = () => useReaderProgressStore.getState().previews['test-book'];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setBookProgress('test-book', {
+      location: 'epubcfi(/6/6)',
+      sectionLabel: 'Chapter 1',
+      sectionHref: 'ch1.xhtml',
+      pageinfo: { current: 7, next: 8, total: 10 },
+    } as BookProgress);
+  });
+  afterEach(() => {
+    cleanup();
+    setBookProgress('test-book', null);
+  });
+
+  it('shows the previewed page in the chrome until the reading position is back', () => {
+    render(<FoliateViewer {...props} />);
+    preview(next);
+
+    expect(previewed()).toMatchObject({
+      progress: {
+        location: 'epubcfi(/6/6)',
+        sectionLabel: 'Chapter 2',
+        sectionHref: 'ch2.xhtml',
+        section: next.section,
+        // The book's last page reads total / total, as a relocation there does.
+        pageinfo: { current: 9, next: 10, total: 10 },
+        timeinfo: next.time,
+        fraction: 1,
+        page: 10,
+      },
+      page: 4,
+      pages: 5,
+      atEnd: true,
+    });
+
+    preview(null);
+    expect(previewed()).toBeNull();
+    // Display only: the reading position never moved.
+    expect(setProgress).not.toHaveBeenCalled();
   });
 });
 

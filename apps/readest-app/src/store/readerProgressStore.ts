@@ -2,6 +2,20 @@ import { create } from 'zustand';
 import { BookProgress } from '@/types/book';
 
 /**
+ * A page a native page turn paints under its cover to capture it (paginator
+ * `previewPage`). The capture takes in the running header and footer
+ * (#8068), so while it is set they show this page, not the reading position.
+ * Display only: nothing takes it as reading progress.
+ */
+export interface PagePreview {
+  progress: BookProgress;
+  // The renderer's page, pages and atEnd once on this page.
+  page: number;
+  pages: number;
+  atEnd: boolean;
+}
+
+/**
  * Per-book reading progress, kept in its own store so that high-frequency
  * `setProgress` writes (fired once per page turn / scroll snap) do not
  * notify every component subscribed to `useReaderStore()`.
@@ -55,10 +69,12 @@ import { BookProgress } from '@/types/book';
 interface ReaderProgressState {
   // Keyed by book view key (matches readerStore.viewStates keys).
   progresses: { [key: string]: BookProgress | null };
+  previews: { [key: string]: PagePreview | null };
 }
 
 export const useReaderProgressStore = create<ReaderProgressState>(() => ({
   progresses: {},
+  previews: {},
 }));
 
 /**
@@ -90,12 +106,25 @@ export const setBookProgress = (key: string, progress: BookProgress | null) => {
  */
 export const clearBookProgress = (key: string) => {
   useReaderProgressStore.setState((state) => {
-    if (!(key in state.progresses)) return state;
-    const next = { ...state.progresses };
-    delete next[key];
-    return { progresses: next };
+    if (!(key in state.progresses) && !(key in state.previews)) return state;
+    const progresses = { ...state.progresses };
+    const previews = { ...state.previews };
+    delete progresses[key];
+    delete previews[key];
+    return { progresses, previews };
   });
 };
+
+export const setPagePreview = (key: string, preview: PagePreview | null) => {
+  useReaderProgressStore.setState((state) =>
+    (state.previews[key] ?? null) === preview
+      ? state
+      : { previews: { ...state.previews, [key]: preview } },
+  );
+};
+
+export const usePagePreview = (key: string): PagePreview | null =>
+  useReaderProgressStore((s) => s.previews[key] ?? null);
 
 /**
  * Reactive subscription — components that need to re-render when this

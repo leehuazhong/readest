@@ -6,6 +6,7 @@ import ProgressBar from '@/app/reader/components/ProgressBar';
 import { DEFAULT_VIEW_CONFIG } from '@/services/constants';
 import { clearChapterScreens, recordChapterScreens } from '@/utils/chapterScreens';
 import type { BookProgress, ViewSettings } from '@/types/book';
+import type { PagePreview } from '@/store/readerProgressStore';
 import type { TOCItem } from '@/libs/document';
 
 const saveViewSettings = vi.fn();
@@ -16,6 +17,7 @@ vi.mock('@/hooks/useMedianPageDurationSecs', () => ({
 
 let currentViewSettings: ViewSettings;
 let currentProgress: BookProgress | null;
+let currentPreview: PagePreview | null = null;
 let currentBookData: {
   isFixedLayout: boolean;
   bookDoc?: {
@@ -74,6 +76,7 @@ vi.mock('@/store/readerStore', () => {
 vi.mock('@/store/readerProgressStore', () => ({
   useBookProgress: () => currentProgress,
   getBookProgress: () => currentProgress,
+  usePagePreview: () => currentPreview,
 }));
 
 vi.mock('@/store/bookDataStore', () => {
@@ -124,6 +127,7 @@ beforeEach(() => {
   medianPageDurationSecs = null;
   currentAppService = { isMobile: false, hasSafeAreaInset: false };
   currentProgress = null;
+  currentPreview = null;
   currentBookData = { isFixedLayout: false };
   currentRenderer = { page: 0, pages: 0 };
   currentSectionFractions = [];
@@ -313,6 +317,41 @@ describe('ProgressBar — calibrated page pair', () => {
     const { container } = renderProgressBar();
 
     expect(container.querySelector('.progress-info-label')?.textContent).toBe('3 / 5');
+  });
+});
+
+// A native page turn captures the next page with the footer over it (#8068).
+describe('ProgressBar — a page a native turn previews', () => {
+  it('shows the previewed page, then the reading position again', () => {
+    currentViewSettings = {
+      ...baseSettings,
+      progressStyle: 'fraction',
+      showProgressInfo: true,
+      showRemainingPages: true,
+    } as ViewSettings;
+    currentProgress = makeProgress(2, 10);
+    currentRenderer = { page: 1, pages: 4 };
+    currentPreview = { progress: makeProgress(3, 10), page: 2, pages: 4, atEnd: false };
+
+    const { container, rerender } = renderProgressBar();
+    const label = () => container.querySelector('.progress-info-label')?.textContent;
+    const info = () => container.querySelector('.progressinfo')?.getAttribute('aria-label');
+    expect(label()).toBe('4 / 10');
+    expect(info()).toContain('On 3 of 4 page');
+    expect(info()).toContain('2 pages left in chapter');
+
+    currentPreview = null;
+    rerender(
+      <ProgressBar
+        bookKey='book-1'
+        horizontalGap={0}
+        contentInsets={{ top: 0, right: 0, bottom: 0, left: 0 }}
+        gridInsets={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      />,
+    );
+    expect(label()).toBe('3 / 10');
+    expect(info()).toContain('On 2 of 4 page');
+    expect(info()).toContain('3 pages left in chapter');
   });
 });
 

@@ -831,4 +831,73 @@ describe('FoliateView CFI navigation (browser)', () => {
     expect(chapterHeading).toBeDefined();
     expect(chapterHeading!.textContent).toContain('Chapter 5');
   });
+
+  // A native page turn paints the adjacent page under its cover to capture it,
+  // with the header and footer over it (#8068). The preview names that page's
+  // location, so they can show it: it must be the location the turn reaches.
+  it.each([
+    360, 800,
+  ])('previews the location a turn then reaches, within and across sections (%ipx)', async (width) => {
+    view = createView();
+    view.style.width = `${width}px`;
+    await view.open(book);
+    const start = book.sections!.findIndex((s) => s.linear !== 'no' && s.size > 10000);
+    const stabilized = new Promise<void>((resolve) => {
+      view.renderer.addEventListener('stabilized', () => resolve(), { once: true });
+    });
+    await view.goTo(start);
+    await stabilized;
+
+    const previewThenTurn = async (forward: boolean) => {
+      // The next section has to be loaded beside this one to be previewed.
+      await vi.waitUntil(() => view.renderer.getPageTurnKey?.(forward ? 1 : -1), {
+        timeout: 5000,
+      });
+      let previews: unknown[] = [];
+      const onPreview = (e: Event) => previews.push((e as CustomEvent).detail);
+      view.addEventListener('preview', onPreview);
+      // A resize can cancel a preview during its paint frames: try again.
+      await vi.waitUntil(
+        async () => {
+          previews = [];
+          return (await view.renderer.previewPage!(forward, async () => 'captured')) !== null;
+        },
+        { timeout: 3000, interval: 20 },
+      );
+      view.removeEventListener('preview', onPreview);
+      expect(previews).toHaveLength(2);
+      expect(previews[1]).toBeNull();
+      const preview = previews[0] as Record<string, unknown>;
+
+      const relocates: Record<string, unknown>[] = [];
+      const onRelocate = (e: Event) => relocates.push((e as CustomEvent).detail);
+      view.addEventListener('relocate', onRelocate);
+      await (forward ? view.next() : view.prev());
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      view.removeEventListener('relocate', onRelocate);
+      const relocated = relocates.at(-1)!;
+      expect(preview).toMatchObject({
+        fraction: relocated['fraction'],
+        section: relocated['section'],
+        location: relocated['location'],
+        time: relocated['time'],
+        tocItem: relocated['tocItem'],
+        pageItem: relocated['pageItem'],
+        page: view.renderer.page,
+        pages: view.renderer.pages,
+        atEnd: view.renderer.atEnd,
+      });
+      return (relocated['section'] as { current: number }).current;
+    };
+
+    // Within the section both ways, then on into the next one.
+    expect(await previewThenTurn(true)).toBe(start);
+    expect(await previewThenTurn(false)).toBe(start);
+    let section = start;
+    for (let turns = 0; section === start; turns++) {
+      expect(turns).toBeLessThan(40);
+      section = await previewThenTurn(true);
+    }
+    expect(section).toBeGreaterThan(start);
+  }, 30000);
 });

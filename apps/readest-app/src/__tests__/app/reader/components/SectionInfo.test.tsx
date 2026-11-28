@@ -2,7 +2,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
 import SectionInfo from '@/app/reader/components/SectionInfo';
-import { clearBookProgress, setBookProgress } from '@/store/readerProgressStore';
+import { clearBookProgress, setBookProgress, setPagePreview } from '@/store/readerProgressStore';
 import type { BookProgress } from '@/types/book';
 
 let currentBookData:
@@ -76,6 +76,20 @@ describe('SectionInfo title', () => {
     turnInto('Chapter 2');
 
     expect(title()).toBe('Chapter 2');
+  });
+
+  // A native page turn captures the next page with the header over it (#8068).
+  it('shows the section of a page a native turn previews, then the reading position again', () => {
+    turnInto('Chapter 1');
+    const { container } = render(<SectionInfo {...baseProps} />);
+    const title = () => container.querySelector('[aria-label^="Section Title"]')?.textContent;
+
+    const progress = { location: 'cfi', sectionLabel: 'Chapter 2' } as BookProgress;
+    act(() => setPagePreview('book-1', { progress, page: 0, pages: 5, atEnd: false }));
+    expect(title()).toBe('Chapter 2');
+
+    act(() => setPagePreview('book-1', null));
+    expect(title()).toBe('Chapter 1');
   });
 });
 

@@ -4,7 +4,7 @@ import { Insets } from '@/types/misc';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useReaderStore } from '@/store/readerStore';
-import { useBookProgressValue } from '@/store/readerProgressStore';
+import { useBookProgressValue, usePagePreview } from '@/store/readerProgressStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { eventDispatcher } from '@/utils/event';
 import {
@@ -20,7 +20,6 @@ import {
   isChromeStyled,
 } from '../utils/headerFooterStyle';
 import { useBookDataStore } from '@/store/bookDataStore';
-import { usePageTurnPreview } from '../utils/pageTurnPreview';
 
 interface SectionInfoProps {
   bookKey: string;
@@ -53,7 +52,8 @@ const SectionInfo: React.FC<SectionInfoProps> = ({
   const { appService } = useEnv();
   // Subscribed here, not in the cell: a turn into the next section re-renders the title alone.
   const liveSection = useBookProgressValue(bookKey, (p) => p.sectionLabel);
-  const preview = usePageTurnPreview(bookKey);
+  // The page a native turn is capturing under its cover, as in ProgressBar.
+  const preview = usePagePreview(bookKey);
   const section = preview ? preview.progress.sectionLabel : liveSection;
   const { hoveredBookKey, getView, getViewSettings, setHoveredBookKey } = useReaderStore();
   const { systemUIVisible, statusBarHeight, isIPhoneDuo } = useThemeStore();

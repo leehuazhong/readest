@@ -37,7 +37,8 @@ export const getScreenPageInfo = (
   view: FoliateView | null | undefined,
   sections: CalibratedSectionSource[],
   progress: BookProgress | null | undefined,
-  rendererOverride?: { page: number; atEnd: boolean },
+  // The page on screen: the renderer's, or the page a native turn previews.
+  screen: { page: number; atEnd?: boolean } | undefined = view?.renderer,
 ): PageInfo => {
   const spine = progress?.section?.current ?? 0;
   const sectionFractions = view?.getSectionFractions() ?? [];
@@ -49,15 +50,14 @@ export const getScreenPageInfo = (
     bookKey,
     sections,
     spine,
-    rendererOverride ? rendererOverride.page : (view?.renderer?.page ?? 0),
+    screen?.page ?? 0,
     (sections[spine]?.size ?? 0) > CHUNKED_SECTION_THRESHOLD,
     chapterFraction,
   );
   // At two columns a short last chapter can share the last screen with the
   // one before, and only the first is the screen's primary chapter: the last
   // screen still reads total / total, as the byte-grid pair does.
-  const atEnd = rendererOverride ? rendererOverride.atEnd : view?.renderer?.atEnd;
-  const current = atEnd ? pair.total - 1 : pair.current;
+  const current = screen?.atEnd ? pair.total - 1 : pair.current;
   return { current, next: current, total: pair.total };
 };
 

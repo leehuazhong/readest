@@ -14,6 +14,7 @@ import { Insets } from '@/types/misc';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useReaderStore } from '@/store/readerStore';
+import { getBookProgress, setPagePreview } from '@/store/readerProgressStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomFontStore } from '@/store/customFontStore';
@@ -185,6 +186,13 @@ const PositionFollowers: React.FC<{
     ) : null,
   );
 };
+
+// Foliate rounds a location down, so the book's last page reads total / total.
+const pageInfoAt = ({ current, next, total }: PageInfo, atEnd: boolean): PageInfo => ({
+  current: atEnd && total > 0 ? total - 1 : current,
+  next,
+  total,
+});
 
 const FoliateViewer: React.FC<{
   bookKey: string;
@@ -394,10 +402,7 @@ const FoliateViewer: React.FC<{
     pendingRelocateRef.current = null;
     if (!event) return;
     const detail = event.detail;
-    const atEnd = viewRef.current?.renderer.atEnd || false;
-    const { current, next, total } = detail.location as PageInfo;
-    const currentPage = atEnd && total > 0 ? total - 1 : current;
-    const pageInfo = { current: currentPage, next, total };
+    const pageInfo = pageInfoAt(detail.location, viewRef.current?.renderer.atEnd || false);
     setProgress(
       bookKey,
       detail.cfi,
@@ -443,6 +448,38 @@ const FoliateViewer: React.FC<{
     // A CarPlay-only WebView can report "visible" without a phone scene
     // driving animation frames. TTS still needs its reading position.
     relocateTimeoutRef.current = setTimeout(commitRelocate, 100);
+  };
+
+  // A native page turn paints the next or previous page under its cover to
+  // capture it, header and footer included (#8068). Foliate names that page,
+  // then null once the reading position is back on screen.
+  const pagePreviewHandler = (event: Event) => {
+    const detail = (event as CustomEvent).detail;
+    const progress = getBookProgress(bookKey);
+    if (!detail?.location || !progress) {
+      setPagePreview(bookKey, null);
+      return;
+    }
+    const pageinfo = pageInfoAt(detail.location, detail.atEnd);
+    // What setProgress would store for a relocation to that page.
+    setPagePreview(bookKey, {
+      progress: {
+        ...progress,
+        sectionHref: detail.tocItem?.href,
+        sectionLabel: detail.tocItem?.label,
+        pageItem: detail.pageItem,
+        section: detail.section,
+        pageinfo,
+        timeinfo: detail.time,
+        fraction: detail.fraction,
+        index: detail.section.current,
+        range: detail.range,
+        page: pageinfo.current + 1,
+      },
+      page: detail.page,
+      pages: detail.pages,
+      atEnd: detail.atEnd,
+    });
   };
 
   useEffect(() => {
@@ -1053,6 +1090,7 @@ const FoliateViewer: React.FC<{
     onLoad: docLoadHandler,
     onStabilized: stabilizedHandler,
     onRelocate: progressRelocateHandler,
+    onPreview: pagePreviewHandler,
     onRendererRelocate: docRelocateHandler,
     onNavigateStart: navigateStartHandler,
     onNavigateEnd: navigateEndHandler,

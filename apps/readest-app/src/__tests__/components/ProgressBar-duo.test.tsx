@@ -35,6 +35,7 @@ vi.mock('@/store/readerStore', () => {
 vi.mock('@/store/readerProgressStore', () => ({
   useBookProgress: () => null,
   getBookProgress: () => null,
+  usePagePreview: () => null,
 }));
 vi.mock('@/store/bookDataStore', () => {
   const state = { getBookData: () => ({ isFixedLayout: false }) };

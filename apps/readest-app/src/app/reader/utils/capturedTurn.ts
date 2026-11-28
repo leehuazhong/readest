@@ -57,12 +57,6 @@ export interface CapturedTurnHost {
     | void
     | (() => void | Promise<void>)
     | Promise<void | (() => void | Promise<void>)>;
-  /**
-   * Temporarily display the adjacent page's chrome (footer page number,
-   * progress bar, running header) while `previewPage()` renders that page
-   * under the native cover. Returns an idempotent restore callback.
-   */
-  beginPagePreview?: (forward: boolean) => (() => void) | void;
   /** Whether a freshly captured frame is still safe to reveal and navigate. */
   isCaptureAllowed?: () => boolean;
   /**

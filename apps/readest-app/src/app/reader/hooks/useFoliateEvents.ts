@@ -5,6 +5,7 @@ type FoliateEventHandler = {
   onLoad?: (event: Event) => void;
   onStabilized?: (event: Event) => void;
   onRelocate?: (event: Event) => void;
+  onPreview?: (event: Event) => void;
   onLinkClick?: (event: Event) => void;
   onRendererRelocate?: (event: Event) => void;
   onCreateOverlay?: (event: Event) => void;
@@ -18,6 +19,7 @@ export const useFoliateEvents = (view: FoliateView | null, handlers?: FoliateEve
   const onLoad = handlers?.onLoad;
   const onStabilized = handlers?.onStabilized;
   const onRelocate = handlers?.onRelocate;
+  const onPreview = handlers?.onPreview;
   const onLinkClick = handlers?.onLinkClick;
   const onRendererRelocate = handlers?.onRendererRelocate;
   const onCreateOverlay = handlers?.onCreateOverlay;
@@ -31,6 +33,7 @@ export const useFoliateEvents = (view: FoliateView | null, handlers?: FoliateEve
     if (onLoad) view.addEventListener('load', onLoad);
     if (onStabilized) view.renderer.addEventListener('stabilized', onStabilized);
     if (onRelocate) view.addEventListener('relocate', onRelocate);
+    if (onPreview) view.addEventListener('preview', onPreview);
     if (onLinkClick) view.addEventListener('link', onLinkClick);
     if (onRendererRelocate) view.renderer.addEventListener('relocate', onRendererRelocate);
     if (onCreateOverlay) view.addEventListener('create-overlay', onCreateOverlay);
@@ -43,6 +46,7 @@ export const useFoliateEvents = (view: FoliateView | null, handlers?: FoliateEve
       if (onLoad) view.removeEventListener('load', onLoad);
       if (onStabilized) view.renderer.removeEventListener('stabilized', onStabilized);
       if (onRelocate) view.removeEventListener('relocate', onRelocate);
+      if (onPreview) view.removeEventListener('preview', onPreview);
       if (onLinkClick) view.removeEventListener('link', onLinkClick);
       if (onRendererRelocate) view.renderer.removeEventListener('relocate', onRendererRelocate);
       if (onCreateOverlay) view.removeEventListener('create-overlay', onCreateOverlay);
